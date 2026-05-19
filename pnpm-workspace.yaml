@@ -1,0 +1,11 @@
+packages:
+  - .
+
+overrides:
+  rollup: npm:@rollup/wasm-node@4.60.4
+
+onlyBuiltDependencies:
+  - esbuild
+
+allowBuilds:
+  esbuild: true
