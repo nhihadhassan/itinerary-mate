@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Itinerary Mate app icon">
+  <rect width="512" height="512" rx="112" fill="#f6f3ea"/>
+  <path d="M138 176c0-34 28-62 62-62h112c34 0 62 28 62 62v28h18c28 0 50 22 50 50v118c0 28-22 50-50 50H120c-28 0-50-22-50-50V254c0-28 22-50 50-50h18v-28Zm44 28h148v-28c0-10-8-18-18-18H200c-10 0-18 8-18 18v28Z" fill="#285f48"/>
+  <path d="M142 272h228M142 330h160" fill="none" stroke="#fffdf8" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="374" cy="330" r="20" fill="#f0b35b"/>
+</svg>

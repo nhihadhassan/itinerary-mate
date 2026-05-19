@@ -24,6 +24,26 @@
   --radius: 8px;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #eef4ed;
+  --muted: #aebdb6;
+  --soft: #17231f;
+  --surface: #101816;
+  --surface-strong: #17211e;
+  --line: #2d3c36;
+  --line-strong: #42564e;
+  --green: #9dd6b8;
+  --green-2: #1d372b;
+  --red: #ffb09a;
+  --red-soft: #3a1b14;
+  --amber: #f2ca74;
+  --amber-soft: #332814;
+  --blue: #9dccdf;
+  --blue-soft: #183040;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -39,6 +59,12 @@ body {
   background:
     radial-gradient(circle at top left, rgba(202, 225, 215, 0.75), transparent 34rem),
     linear-gradient(180deg, #fbf7ed 0%, #eff5f0 100%);
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at top left, rgba(58, 92, 78, 0.48), transparent 34rem),
+    linear-gradient(180deg, #0c1311 0%, #121c19 100%);
 }
 
 body,
@@ -128,6 +154,46 @@ img {
   gap: 18px;
   align-items: end;
   padding: 24px 0 12px;
+}
+
+.brand-block {
+  max-width: 720px;
+}
+
+.brand-block p:last-child {
+  max-width: 62ch;
+  margin-top: 10px;
+}
+
+.trip-switcher {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.55);
+  padding: 4px;
+}
+
+:root[data-theme="dark"] .trip-switcher,
+:root[data-theme="dark"] .nav-tabs,
+:root[data-theme="dark"] .filter-bar {
+  background: rgba(16, 24, 22, 0.86);
+}
+
+.trip-switcher button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.trip-switcher button.active {
+  background: var(--ink);
+  color: var(--surface);
 }
 
 .topbar-actions,
@@ -1031,5 +1097,333 @@ img {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+/* Multi-trip Itinerary Mate additions */
+.dashboard-grid,
+.budget-hero,
+.overview-grid,
+.logistics-grid,
+.assistant-grid,
+.export-group-grid,
+.attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.metric-card,
+.anchor-card,
+.logistics-card,
+.attachment-card,
+.suggestion-card,
+.api-note,
+.inline-editor,
+.budget-columns > section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.metric-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.metric-card strong {
+  font-size: 1.05rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.metric-card span,
+.attachment-card span,
+.quiet-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.metric-icon {
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--green-2);
+  color: var(--green);
+}
+
+.filter-selects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.activity-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.browser-grid {
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+}
+
+.card-image {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--soft);
+}
+
+.card-image img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.category-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  border-radius: 999px;
+  background: rgba(24, 33, 31, 0.84);
+  color: #fffdf8;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.card-image .drag-handle {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+:root[data-theme="dark"] .card-image .drag-handle {
+  background: rgba(16, 24, 22, 0.82);
+}
+
+.card-body,
+.expanded-panel,
+.logistics-stack,
+.assistant-panel,
+.suggestion-list,
+.maps-list {
+  display: grid;
+  gap: 12px;
+}
+
+.card-body {
+  padding: 2px 2px 4px;
+}
+
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .hero-panel,
+:root[data-theme="dark"] .filter-bar,
+:root[data-theme="dark"] .day-column,
+:root[data-theme="dark"] .day-card,
+:root[data-theme="dark"] .place-card,
+:root[data-theme="dark"] .empty-state,
+:root[data-theme="dark"] .metric-card,
+:root[data-theme="dark"] .anchor-card,
+:root[data-theme="dark"] .logistics-card,
+:root[data-theme="dark"] .attachment-card,
+:root[data-theme="dark"] .api-note,
+:root[data-theme="dark"] .inline-editor,
+:root[data-theme="dark"] .budget-columns > section {
+  border-color: var(--line);
+  background: rgba(23, 33, 30, 0.9);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .search-field,
+:root[data-theme="dark"] .chip,
+:root[data-theme="dark"] .field input,
+:root[data-theme="dark"] .field select,
+:root[data-theme="dark"] .field textarea,
+:root[data-theme="dark"] .branch-toggle button {
+  background: #101816;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.card-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.card-title-row h3,
+.logistics-card h3,
+.attachment-card h3,
+.maps-row strong {
+  overflow-wrap: anywhere;
+}
+
+.expanded-panel {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.detail-list {
+  display: grid;
+  gap: 6px;
+  border-radius: var(--radius);
+  background: var(--soft);
+  padding: 12px;
+}
+
+.budget-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.budget-row,
+.budget-edit-row,
+.export-row-button,
+.maps-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.budget-edit-row {
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+}
+
+.budget-edit-row input {
+  inline-size: 100%;
+}
+
+.export-row-button {
+  inline-size: 100%;
+  min-height: 48px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.maps-row {
+  grid-template-columns: 1fr;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  padding: 12px;
+}
+
+.maps-row span,
+.maps-row small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.maps-toolbar,
+.prompt-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachment-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.suggestion-card {
+  display: flex;
+  gap: 12px;
+  box-shadow: none;
+}
+
+.suggestion-card.warning {
+  background: var(--amber-soft);
+}
+
+.suggestion-card.info {
+  background: var(--blue-soft);
+}
+
+.api-note {
+  box-shadow: none;
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 160px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-strong) 80%, transparent);
+  padding: 20px;
+  text-align: center;
+}
+
+.completed {
+  opacity: 0.72;
+}
+
+.drop-active {
+  outline: 3px solid color-mix(in srgb, var(--green) 40%, transparent);
+  outline-offset: 2px;
+}
+
+@media (min-width: 900px) {
+  .nav-tabs {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  h1 {
+    max-width: none;
+  }
+
+  .trip-switcher {
+    inline-size: 100%;
+  }
+
+  .nav-tabs {
+    grid-template-columns: repeat(7, minmax(94px, 1fr));
+  }
+
+  .budget-edit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .card-image {
+    aspect-ratio: 16 / 9;
   }
 }

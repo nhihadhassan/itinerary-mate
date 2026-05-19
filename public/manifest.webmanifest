@@ -1,0 +1,18 @@
+{
+  "name": "Itinerary Mate",
+  "short_name": "Itinerary Mate",
+  "description": "Local-first multi-trip itinerary tracker for Japan, Peru, budgets, flights, lodging, notes, and map exports.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f3ea",
+  "theme_color": "#285f48",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

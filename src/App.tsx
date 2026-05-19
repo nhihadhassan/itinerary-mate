@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -12,6 +13,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   BadgeCheck,
+  Bot,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -19,15 +21,18 @@ import {
   Clipboard,
   CloudRain,
   Download,
+  FileText,
   GripVertical,
   Hotel,
   Map as MapIcon,
   MapPin,
-  Pencil,
+  Moon,
+  Plane,
   Plus,
   RotateCcw,
   Search,
   Sparkles,
+  Sun,
   Train,
   Trash2,
   TriangleAlert,
@@ -36,87 +41,93 @@ import {
   Activity,
   Category,
   DEFAULT_CAD_TO_JPY,
+  StayArea,
   TripBranch,
-  categories,
-  dailyCosts,
+  categories as japanCategories,
   defaultActivities,
   defaultStayAreas,
   reasonBuckets,
   routeMoves,
-  specialExperiences,
   tripAnchors,
 } from "./japanItinerary";
+import { peruRouteSuggestions, peruTrip } from "./peruItinerary";
+import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
 
-type BudgetKey = "estimatedCostLow" | "estimatedCostMid" | "estimatedCostHigh";
-type AppView = "overview" | "itinerary" | "places" | "budget" | "maps";
+type AppView = "dashboard" | "itinerary" | "places" | "budget" | "logistics" | "maps" | "assistant";
+type ThemePreference = "system" | "light" | "dark";
 
-interface PersistedState {
+interface LegacyJapanState {
   version: 1;
   activities: Activity[];
   branch: TripBranch;
   cadToJpy: number;
-  stayAreas: typeof defaultStayAreas;
+  stayAreas: StayArea[];
   updatedAt: string;
 }
 
-interface BudgetTriple {
+interface MultiTripState {
+  version: 2;
+  activeTripId: TripId;
+  trips: Record<TripId, Trip>;
+  japanBranch: TripBranch;
+  japanCadToJpy: number;
+  themePreference: ThemePreference;
+  updatedAt: string;
+}
+
+interface BudgetRange {
   low: number;
   mid: number;
   high: number;
 }
 
-const STORAGE_KEY = "september-japan-planner-v1";
-
+const MULTI_STORAGE_KEY = "itinerary-mate-v2";
+const LEGACY_JAPAN_STORAGE_KEY = "september-japan-planner-v1";
+const tripOrder: TripId[] = ["japan-2026", "peru-2026"];
 const navItems: Array<{ id: AppView; label: string }> = [
-  { id: "overview", label: "Overview" },
+  { id: "dashboard", label: "Dashboard" },
   { id: "itinerary", label: "Itinerary" },
   { id: "places", label: "Places" },
   { id: "budget", label: "Budget" },
+  { id: "logistics", label: "Logistics" },
   { id: "maps", label: "Maps" },
+  { id: "assistant", label: "AI" },
 ];
 
-const days = Array.from({ length: 30 }, (_, index) => index + 1);
-
-const placeholderThemes = [
-  "linear-gradient(135deg, #d9f0ff 0%, #f8e5d2 48%, #f7fbef 100%)",
-  "linear-gradient(135deg, #e4efe7 0%, #f5ead6 50%, #d6e8f5 100%)",
-  "linear-gradient(135deg, #f7dfd4 0%, #eef3df 52%, #dbe9f6 100%)",
-  "linear-gradient(135deg, #e1edf1 0%, #f8e6c8 54%, #f6f1f7 100%)",
+const categoryOptions: TripCategory[] = [
+  "Must See",
+  "Non-Negotiable",
+  "Nice To Have",
+  "Extra",
+  "Flight",
+  "Hotel",
+  "Food",
+  "Transit",
+  "Note",
 ];
 
-function loadState(): PersistedState {
+function placeholderFor(text: string) {
+  const hue = Math.abs([...text].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % 360;
+  return `linear-gradient(135deg, hsl(${hue} 45% 84%) 0%, hsl(${(hue + 42) % 360} 38% 92%) 52%, hsl(${(hue + 118) % 360} 35% 87%) 100%)`;
+}
+
+function parseStored<T>(key: string): T | null {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) throw new Error("No stored state");
-    const parsed = JSON.parse(stored) as PersistedState;
-    if (parsed.version !== 1 || !Array.isArray(parsed.activities)) throw new Error("Bad stored state");
-    return {
-      ...parsed,
-      activities: hydrateActivities(parsed.activities),
-      stayAreas: parsed.stayAreas?.length ? parsed.stayAreas : defaultStayAreas,
-      cadToJpy: parsed.cadToJpy || DEFAULT_CAD_TO_JPY,
-      branch: parsed.branch || "hokkaido",
-    };
+    const stored = localStorage.getItem(key);
+    return stored ? (JSON.parse(stored) as T) : null;
   } catch {
-    return {
-      version: 1,
-      activities: hydrateActivities(defaultActivities),
-      branch: "hokkaido",
-      cadToJpy: DEFAULT_CAD_TO_JPY,
-      stayAreas: defaultStayAreas,
-      updatedAt: new Date().toISOString(),
-    };
+    return null;
   }
 }
 
-function hydrateActivities(activities: Activity[]) {
+function hydrateJapanActivities(activities: Activity[]) {
   const defaultsById = new Map(defaultActivities.map((activity) => [activity.id, activity]));
   return activities.map((activity) => {
     const fallback = defaultsById.get(activity.id);
     return {
       ...activity,
       imageUrl: activity.imageUrl || fallback?.imageUrl || "",
-      imageAlt: activity.imageAlt || fallback?.imageAlt || `Generated scenic placeholder for ${activity.title}.`,
+      imageAlt: activity.imageAlt || fallback?.imageAlt || `Image-style placeholder for ${activity.title}.`,
       imageCredit: activity.imageCredit || fallback?.imageCredit,
       imageCreditUrl: activity.imageCreditUrl || fallback?.imageCreditUrl,
       imageLicense: activity.imageLicense || fallback?.imageLicense,
@@ -125,278 +136,412 @@ function hydrateActivities(activities: Activity[]) {
   });
 }
 
-function formatJpy(value: number) {
-  return new Intl.NumberFormat("ja-JP", {
-    style: "currency",
+function japanActivityToTripActivity(activity: Activity): TripActivity {
+  return {
+    id: activity.id,
+    tripId: "japan-2026",
+    day: activity.day,
+    city: activity.city,
+    country: "Japan",
+    title: activity.title,
+    description: activity.description,
+    category: activity.category,
+    address: "",
+    googleMapsQuery: activity.googleMapsQuery,
+    duration: activity.visitDuration,
+    travelTimeFromPrevious: activity.travelTimeFromBase,
+    transportMode: "local transit",
+    estimatedCost: activity.estimatedCostMid,
+    estimatedCostLow: activity.estimatedCostLow,
+    estimatedCostMid: activity.estimatedCostMid,
+    estimatedCostHigh: activity.estimatedCostHigh,
     currency: "JPY",
-    maximumFractionDigits: 0,
-  }).format(Math.round(value));
+    attachmentIds: [],
+    notes: activity.notes,
+    imageUrl: activity.imageUrl || placeholderFor(activity.title),
+    imageAlt: activity.imageAlt,
+    priority: activity.priority,
+    isBooked: activity.isBooked,
+    isCompleted: activity.isCompleted,
+    source: "japan-default",
+    branch: activity.branch,
+  };
 }
 
-function formatCad(value: number, cadToJpy: number) {
-  const amount = new Intl.NumberFormat("en-CA", {
-    maximumFractionDigits: 0,
-  }).format(Math.round(value / cadToJpy));
-  return `CAD ${amount}`;
+function japanStayToHotel(stay: StayArea): TripHotel {
+  const nights = Math.max(1, stay.nights);
+  return {
+    id: `japan-hotel-${stay.id}`,
+    tripId: "japan-2026",
+    name: stay.area,
+    city: stay.city,
+    country: "Japan",
+    checkIn: stay.days,
+    checkOut: stay.days,
+    estimatedCost: stay.estimatedMidPerNight * nights,
+    currency: "JPY",
+    notes: `${nights} nights. ${stay.note}`,
+  };
 }
 
-function moneyRange(low: number, mid: number, high: number, cadToJpy: number) {
-  return `${formatJpy(low)}-${formatJpy(high)} | ${formatCad(low, cadToJpy)}-${formatCad(high, cadToJpy)}`;
+function buildJapanTrip(activities = defaultActivities, stayAreas = defaultStayAreas): Trip {
+  return {
+    id: "japan-2026",
+    title: "Japan Trip",
+    country: "Japan",
+    startDate: "2026-09-01",
+    endDate: "2026-09-30",
+    currency: "JPY",
+    description: "A month in Japan built around Tokyo, Fuji, Kyoto, Osaka, Hiroshima, the Alps, and one northern or southern extension.",
+    activities: hydrateJapanActivities(activities).map(japanActivityToTripActivity),
+    flights: [
+      {
+        id: "japan-flight-inbound-placeholder",
+        tripId: "japan-2026",
+        airline: "Add airline",
+        flightNumber: "Add flight",
+        departureAirport: "Add departure airport",
+        arrivalAirport: "Tokyo",
+        departureTime: "2026-09-01T00:00:00",
+        arrivalTime: "2026-09-01T00:00:00",
+        status: "pending",
+        notes: "Manual placeholder. Add real flight details when booked.",
+      },
+    ],
+    hotels: stayAreas.map(japanStayToHotel),
+    attachments: [
+      {
+        id: "japan-rail-bookings-placeholder",
+        tripId: "japan-2026",
+        fileName: "rail-and-hotel-bookings-placeholder.pdf",
+        type: "booking",
+        note: "Local-only metadata placeholder for rail passes, hotels, and tickets.",
+        isSensitivePlaceholder: true,
+      },
+    ],
+    notes: "Japan edits from the original planner are preserved when migrating to Itinerary Mate.",
+  };
 }
 
-function sumBudget(items: BudgetTriple[]): BudgetTriple {
-  return items.reduce(
-    (sum, item) => ({
-      low: sum.low + item.low,
-      mid: sum.mid + item.mid,
-      high: sum.high + item.high,
-    }),
+function mergeTrip(defaultTrip: Trip, storedTrip?: Trip): Trip {
+  if (!storedTrip) return defaultTrip;
+  const defaults = new Map(defaultTrip.activities.map((activity) => [activity.id, activity]));
+  const activities = storedTrip.activities.map((activity) => ({
+    ...defaults.get(activity.id),
+    ...activity,
+    attachmentIds: activity.attachmentIds ?? [],
+    imageUrl: activity.imageUrl || defaults.get(activity.id)?.imageUrl || placeholderFor(activity.title),
+    currency: activity.currency || defaultTrip.currency,
+  }));
+  const missingDefaults = defaultTrip.activities.filter((activity) => !activities.some((item) => item.id === activity.id));
+  return {
+    ...defaultTrip,
+    ...storedTrip,
+    activities: [...activities, ...missingDefaults],
+    flights: storedTrip.flights?.length ? storedTrip.flights : defaultTrip.flights,
+    hotels: storedTrip.hotels?.length ? storedTrip.hotels : defaultTrip.hotels,
+    attachments: storedTrip.attachments?.length ? storedTrip.attachments : defaultTrip.attachments,
+  };
+}
+
+function defaultState(): MultiTripState {
+  const legacy = parseStored<LegacyJapanState>(LEGACY_JAPAN_STORAGE_KEY);
+  const japanBranch = legacy?.branch || "hokkaido";
+  return {
+    version: 2,
+    activeTripId: "japan-2026",
+    trips: {
+      "japan-2026": buildJapanTrip(legacy?.activities || defaultActivities, legacy?.stayAreas || defaultStayAreas),
+      "peru-2026": peruTrip,
+    },
+    japanBranch,
+    japanCadToJpy: legacy?.cadToJpy || DEFAULT_CAD_TO_JPY,
+    themePreference: "system",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function loadState(): MultiTripState {
+  const defaults = defaultState();
+  const stored = parseStored<MultiTripState>(MULTI_STORAGE_KEY);
+  if (!stored || stored.version !== 2 || !stored.trips) return defaults;
+  return {
+    ...defaults,
+    ...stored,
+    activeTripId: stored.activeTripId || "japan-2026",
+    japanBranch: stored.japanBranch || "hokkaido",
+    japanCadToJpy: stored.japanCadToJpy || DEFAULT_CAD_TO_JPY,
+    themePreference: stored.themePreference || "system",
+    trips: {
+      "japan-2026": mergeTrip(defaults.trips["japan-2026"], stored.trips["japan-2026"]),
+      "peru-2026": mergeTrip(peruTrip, stored.trips["peru-2026"]),
+    },
+  };
+}
+
+function formatDate(date?: string) {
+  if (!date) return "";
+  return new Intl.DateTimeFormat("en-CA", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${date}T12:00:00`));
+}
+
+function formatMoney(value: number, currency: string, cadToJpy = DEFAULT_CAD_TO_JPY) {
+  if (currency === "JPY") {
+    const jpy = new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(Math.round(value));
+    const cad = `CAD ${new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Math.round(value / cadToJpy))}`;
+    return `${jpy} (${cad})`;
+  }
+  if (currency === "CAD") {
+    const cad = `CAD ${new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Math.round(value))}`;
+    const jpy = new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(Math.round(value * cadToJpy));
+    return `${cad} (${jpy})`;
+  }
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+}
+
+function activityRange(activity: TripActivity): BudgetRange {
+  return {
+    low: activity.estimatedCostLow ?? activity.estimatedCost,
+    mid: activity.estimatedCostMid ?? activity.estimatedCost,
+    high: activity.estimatedCostHigh ?? activity.estimatedCost,
+  };
+}
+
+function sumRanges(ranges: BudgetRange[]): BudgetRange {
+  return ranges.reduce(
+    (total, range) => ({ low: total.low + range.low, mid: total.mid + range.mid, high: total.high + range.high }),
     { low: 0, mid: 0, high: 0 },
   );
 }
 
-function getActiveActivities(activities: Activity[], branch: TripBranch) {
-  return activities.filter((activity) => !activity.branch || activity.branch === branch);
-}
-
-function csvEscape(value: string | number | boolean) {
+function csvEscape(value: string | number | boolean | undefined) {
   const text = String(value ?? "");
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-function makeExportRows(activities: Activity[]) {
+function exportRows(activities: TripActivity[]) {
   return activities
     .slice()
-    .sort((a, b) => a.category.localeCompare(b.category) || a.priority - b.priority || a.day - b.day)
+    .sort((a, b) => a.day - b.day || a.category.localeCompare(b.category) || a.priority - b.priority)
     .map((activity) => ({
       place: activity.title,
+      address: activity.address || activity.googleMapsQuery,
       city: activity.city,
-      query: activity.googleMapsQuery,
       category: activity.category,
-      priority: activity.priority,
-      note: activity.description,
-      duration: activity.visitDuration,
-      budget: `${activity.estimatedCostLow}-${activity.estimatedCostHigh} JPY`,
+      day: activity.day,
+      date: activity.date || "",
+      notes: [activity.description, activity.notes].filter(Boolean).join(" "),
+      estimatedCost: activity.estimatedCost,
+      currency: activity.currency,
+      travelTime: activity.travelTimeFromPrevious || "",
+      query: activity.googleMapsQuery,
     }));
 }
 
-function rowsToCsv(rows: ReturnType<typeof makeExportRows>) {
-  const header = ["Place name", "City", "Google Maps search query", "Category", "Priority", "Short note", "Estimated visit duration", "Estimated budget"];
-  const body = rows.map((row) => [
-    row.place,
-    row.city,
-    row.query,
-    row.category,
-    row.priority,
-    row.note,
-    row.duration,
-    row.budget,
-  ]);
+function rowsToCsv(rows: ReturnType<typeof exportRows>) {
+  const header = ["Place name", "Address or search query", "City", "Category", "Day", "Date", "Notes", "Estimated cost", "Currency", "Travel time"];
+  const body = rows.map((row) => [row.place, row.address || row.query, row.city, row.category, row.day, row.date, row.notes, row.estimatedCost, row.currency, row.travelTime]);
   return [header, ...body].map((row) => row.map(csvEscape).join(",")).join("\n");
 }
 
-function getDayPacing(dayActivities: Activity[]) {
-  const hours = dayActivities.reduce((sum, item) => sum + item.durationHours, 0);
-  const travelMinutes = dayActivities.reduce((sum, item) => sum + item.travelMinutesFromBase, 0);
-  const heavyCount = dayActivities.filter((item) => item.energyLevel === "heavy").length;
-  const score = hours + travelMinutes / 90 + heavyCount * 1.2;
-  if (score >= 9 || dayActivities.length >= 4) return { label: "Too packed", tone: "danger", score };
-  if (score >= 6.5 || heavyCount >= 1) return { label: "Full day", tone: "warn", score };
-  if (score <= 2.5) return { label: "Light day", tone: "calm", score };
-  return { label: "Balanced", tone: "good", score };
+function copyText(text: string) {
+  return navigator.clipboard.writeText(text);
 }
 
-function useAppBudget(activities: Activity[], branch: TripBranch, stayAreas: typeof defaultStayAreas) {
-  return useMemo(() => {
-    const activeActivities = getActiveActivities(activities, branch);
-    const activeStays = stayAreas.filter((stay) => !stay.branch || stay.branch === branch);
-    const activeDaily = dailyCosts.filter((cost) => !cost.branch || cost.branch === branch);
-    const activeMoves = routeMoves.filter((move) => !move.branch || move.branch === branch);
+function dayScore(items: TripActivity[]) {
+  const fullDayCount = items.filter((item) => /full day|half day/i.test(item.duration)).length;
+  const travelHits = items.filter((item) => /hr|hour|flight|train|airport|transfer/i.test(`${item.travelTimeFromPrevious} ${item.transportMode} ${item.duration}`)).length;
+  const score = items.length + fullDayCount * 2 + travelHits * 0.6;
+  if (score >= 7 || items.length >= 5) return { label: "Too packed", tone: "danger" };
+  if (score >= 5 || fullDayCount > 0) return { label: "Full day", tone: "warn" };
+  if (items.length <= 1) return { label: "Light day", tone: "calm" };
+  return { label: "Balanced", tone: "good" };
+}
 
-    const lodging = sumBudget(
-      activeStays.map((stay) => ({
-        low: stay.estimatedLowPerNight * stay.nights,
-        mid: stay.estimatedMidPerNight * stay.nights,
-        high: stay.estimatedHighPerNight * stay.nights,
-      })),
-    );
-    const food = sumBudget(
-      activeDaily.map((cost) => ({
-        low: cost.foodLow * cost.days.length,
-        mid: cost.foodMid * cost.days.length,
-        high: cost.foodHigh * cost.days.length,
-      })),
-    );
-    const localTransit = sumBudget(
-      activeDaily.map((cost) => ({
-        low: cost.localTransitLow * cost.days.length,
-        mid: cost.localTransitMid * cost.days.length,
-        high: cost.localTransitHigh * cost.days.length,
-      })),
-    );
-    const cityTransport = sumBudget(
-      activeMoves.map((move) => ({
-        low: move.estimatedLow,
-        mid: move.estimatedMid,
-        high: move.estimatedHigh,
-      })),
-    );
-    const attractions = sumBudget(
-      activeActivities.map((activity) => ({
-        low: activity.estimatedCostLow,
-        mid: activity.estimatedCostMid,
-        high: activity.estimatedCostHigh,
-      })),
-    );
-    const misc = sumBudget(
-      specialExperiences
-        .filter((experience) => experience.category === "shopping/miscellaneous")
-        .map((experience) => ({
-          low: experience.estimatedLow,
-          mid: experience.estimatedMid,
-          high: experience.estimatedHigh,
-        })),
-    );
-    const transport = {
-      low: localTransit.low + cityTransport.low,
-      mid: localTransit.mid + cityTransport.mid,
-      high: localTransit.high + cityTransport.high,
-    };
-    const total = sumBudget([lodging, food, transport, attractions, misc]);
-
-    const byCity = activeActivities.reduce<Record<string, BudgetTriple>>((acc, activity) => {
-      acc[activity.city] ||= { low: 0, mid: 0, high: 0 };
-      acc[activity.city].low += activity.estimatedCostLow;
-      acc[activity.city].mid += activity.estimatedCostMid;
-      acc[activity.city].high += activity.estimatedCostHigh;
-      return acc;
-    }, {});
-
-    return {
-      total,
-      categories: { lodging, food, transport, attractions, "shopping/miscellaneous": misc },
-      byCity,
-      localTransit,
-      cityTransport,
-    };
-  }, [activities, branch, stayAreas]);
+function visibleActivities(trip: Trip, branch: TripBranch) {
+  if (trip.id !== "japan-2026") return trip.activities;
+  return trip.activities.filter((activity) => !activity.branch || activity.branch === branch);
 }
 
 function App() {
   const initial = useMemo(loadState, []);
-  const [activities, setActivities] = useState<Activity[]>(initial.activities);
-  const [branch, setBranch] = useState<TripBranch>(initial.branch);
-  const [cadToJpy, setCadToJpy] = useState(initial.cadToJpy);
-  const [stayAreas, setStayAreas] = useState(initial.stayAreas);
-  const [activeView, setActiveView] = useState<AppView>("overview");
-  const [selectedCategory, setSelectedCategory] = useState<Category | "All">("All");
+  const [state, setState] = useState<MultiTripState>(initial);
+  const [activeView, setActiveView] = useState<AppView>("dashboard");
+  const [selectedCategory, setSelectedCategory] = useState<TripCategory | "All">("All");
   const [selectedCity, setSelectedCity] = useState("All");
+  const [selectedDay, setSelectedDay] = useState<number | "All">("All");
   const [query, setQuery] = useState("");
-  const [expandedId, setExpandedId] = useState<string | null>(defaultActivities[0]?.id ?? null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState("Saved locally");
   const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(() => new Set());
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
   );
 
-  useEffect(() => {
-    const payload: PersistedState = {
-      version: 1,
-      activities,
-      branch,
-      cadToJpy,
-      stayAreas,
-      updatedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    setSaveStatus(`Saved locally ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
-  }, [activities, branch, cadToJpy, stayAreas]);
+  const activeTrip = state.trips[state.activeTripId];
+  const allVisibleActivities = useMemo(() => visibleActivities(activeTrip, state.japanBranch), [activeTrip, state.japanBranch]);
+  const totalDays = useMemo(() => Math.max(...activeTrip.activities.map((activity) => activity.day), 1), [activeTrip.activities]);
+  const days = useMemo(() => Array.from({ length: totalDays }, (_, index) => index + 1), [totalDays]);
 
-  const activeActivities = useMemo(() => getActiveActivities(activities, branch), [activities, branch]);
-  const cities = useMemo(() => ["All", ...Array.from(new Set(activeActivities.map((activity) => activity.city))).sort()], [activeActivities]);
+  const cities = useMemo(() => ["All", ...Array.from(new Set(allVisibleActivities.map((activity) => activity.city))).sort()], [allVisibleActivities]);
+  const dayOptions = useMemo(() => ["All" as const, ...days], [days]);
+
   const filteredActivities = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return activeActivities.filter((activity) => {
+    return allVisibleActivities.filter((activity) => {
       const categoryMatch = selectedCategory === "All" || activity.category === selectedCategory;
       const cityMatch = selectedCity === "All" || activity.city === selectedCity;
+      const dayMatch = selectedDay === "All" || activity.day === selectedDay;
       const queryMatch =
         !q ||
-        [activity.title, activity.city, activity.region, activity.description, activity.notes]
+        [activity.title, activity.city, activity.country, activity.description, activity.notes, activity.address]
           .join(" ")
           .toLowerCase()
           .includes(q);
-      return categoryMatch && cityMatch && queryMatch;
+      return categoryMatch && cityMatch && dayMatch && queryMatch;
     });
-  }, [activeActivities, query, selectedCategory, selectedCity]);
+  }, [allVisibleActivities, query, selectedCategory, selectedCity, selectedDay]);
 
-  const budget = useAppBudget(activities, branch, stayAreas);
-  const nextEditableDay = useMemo(() => {
-    return days.find((day) => activeActivities.some((activity) => activity.day === day && !activity.isCompleted)) ?? 30;
-  }, [activeActivities]);
-  const tooPackedDays = useMemo(() => {
-    return days.filter((day) => getDayPacing(activeActivities.filter((activity) => activity.day === day)).tone === "danger");
-  }, [activeActivities]);
+  const budget = useMemo(() => makeBudget(activeTrip, allVisibleActivities), [activeTrip, allVisibleActivities]);
+  const routeSuggestions = useMemo(() => makeRouteSuggestions(activeTrip, allVisibleActivities), [activeTrip, allVisibleActivities]);
+  const resolvedTheme = state.themePreference === "system" ? (systemDark ? "dark" : "light") : state.themePreference;
 
-  function updateActivity(id: string, patch: Partial<Activity>) {
-    setActivities((current) => current.map((activity) => (activity.id === id ? { ...activity, ...patch } : activity)));
+  useEffect(() => {
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!media) return;
+    const onChange = () => setSystemDark(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      MULTI_STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+    setSaveStatus(`Saved locally ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
+  }, [state]);
+
+  function updateState(patch: Partial<MultiTripState>) {
+    setState((current) => ({ ...current, ...patch }));
   }
 
-  function deleteActivity(id: string) {
-    const item = activities.find((activity) => activity.id === id);
-    if (!item || !window.confirm(`Delete "${item.title}" from the planner?`)) return;
-    setActivities((current) => current.filter((activity) => activity.id !== id));
-    if (expandedId === id) setExpandedId(null);
+  function updateActiveTrip(patch: Partial<Trip>) {
+    setState((current) => ({
+      ...current,
+      trips: {
+        ...current.trips,
+        [current.activeTripId]: {
+          ...current.trips[current.activeTripId],
+          ...patch,
+        },
+      },
+    }));
+  }
+
+  function updateActivity(id: string, patch: Partial<TripActivity>) {
+    updateActiveTrip({
+      activities: activeTrip.activities.map((activity) => (activity.id === id ? { ...activity, ...patch } : activity)),
+    });
+  }
+
+  function updateHotel(id: string, patch: Partial<TripHotel>) {
+    updateActiveTrip({ hotels: activeTrip.hotels.map((hotel) => (hotel.id === id ? { ...hotel, ...patch } : hotel)) });
   }
 
   function addActivity() {
-    const id = `custom-${Date.now()}`;
-    const newActivity: Activity = {
+    const id = `${activeTrip.id}-custom-${Date.now()}`;
+    const newActivity: TripActivity = {
       id,
-      day: nextEditableDay,
+      tripId: activeTrip.id,
+      day: selectedDay === "All" ? 1 : selectedDay,
+      date: activeTrip.startDate,
+      city: selectedCity === "All" ? activeTrip.country : selectedCity,
+      country: activeTrip.country,
       title: "New custom activity",
-      city: selectedCity === "All" ? "Tokyo" : selectedCity,
-      region: selectedCity === "All" ? "Kanto" : "Custom",
-      category: "Nice To Have",
-      priority: 3,
       description: "Add why this belongs on the trip.",
-      imageUrl: "",
-      estimatedCostLow: 0,
-      estimatedCostMid: 3000,
-      estimatedCostHigh: 8000,
-      visitDuration: "2-3 hr",
-      durationHours: 2.5,
-      travelTimeFromBase: "Add estimate",
-      travelMinutesFromBase: 30,
-      suggestedTimeOfDay: "flexible",
-      energyLevel: "medium",
-      bookingRequired: "optional",
-      weatherSensitive: false,
-      backupOption: "Add a nearby backup",
+      category: "Nice To Have",
+      address: "",
+      googleMapsQuery: `New custom activity ${activeTrip.country}`,
+      duration: "1-2 hr",
+      travelTimeFromPrevious: "Add estimate",
+      transportMode: "",
+      estimatedCost: 0,
+      estimatedCostLow: activeTrip.currency === "JPY" ? 0 : undefined,
+      estimatedCostMid: activeTrip.currency === "JPY" ? 0 : undefined,
+      estimatedCostHigh: activeTrip.currency === "JPY" ? 0 : undefined,
+      currency: activeTrip.currency,
+      attachmentIds: [],
       notes: "",
-      logisticsNotes: "Add routing notes if this affects the day.",
-      googleMapsQuery: "New custom activity Japan",
+      imageUrl: placeholderFor("Custom activity"),
+      imageAlt: "Image-style placeholder for a custom activity.",
+      priority: 3,
       isBooked: false,
       isCompleted: false,
-      imageAlt: "Generated scenic placeholder for a custom activity.",
-      imageSearchQuery: "Custom Japan itinerary place",
+      source: "manual",
     };
-    setActivities((current) => [newActivity, ...current]);
+    updateActiveTrip({ activities: [newActivity, ...activeTrip.activities] });
     setExpandedId(id);
     setActiveView("places");
   }
 
-  function resetPlanner() {
-    if (!window.confirm("Reset the itinerary and budget edits back to the default planner?")) return;
-    setActivities(defaultActivities);
-    setBranch("hokkaido");
-    setCadToJpy(DEFAULT_CAD_TO_JPY);
-    setStayAreas(defaultStayAreas);
-    setSelectedCategory("All");
-    setSelectedCity("All");
-    setQuery("");
-    setExpandedId(defaultActivities[0]?.id ?? null);
+  function deleteActivity(id: string) {
+    const item = activeTrip.activities.find((activity) => activity.id === id);
+    if (!item || !window.confirm(`Delete "${item.title}" from ${activeTrip.title}?`)) return;
+    updateActiveTrip({ activities: activeTrip.activities.filter((activity) => activity.id !== id) });
+    if (expandedId === id) setExpandedId(null);
+  }
+
+  function addRestDay() {
+    const targetDay = selectedDay === "All" ? days[days.length - 1] || 1 : selectedDay;
+    const id = `${activeTrip.id}-rest-${Date.now()}`;
+    updateActiveTrip({
+      activities: [
+        {
+          id,
+          tripId: activeTrip.id,
+          day: targetDay,
+          date: activeTrip.startDate,
+          city: selectedCity === "All" ? activeTrip.country : selectedCity,
+          country: activeTrip.country,
+          title: "Rest day block",
+          description: "Keep this space protected. Laundry, sleep, slow food, and no big transfers.",
+          category: "Note",
+          googleMapsQuery: `${activeTrip.country} rest day`,
+          duration: "Flexible",
+          estimatedCost: 0,
+          currency: activeTrip.currency,
+          attachmentIds: [],
+          notes: "",
+          imageUrl: placeholderFor("Rest day"),
+          imageAlt: "Calm placeholder for a rest day.",
+          priority: 4,
+          isBooked: false,
+          isCompleted: false,
+          source: "manual",
+        },
+        ...activeTrip.activities,
+      ],
+    });
+  }
+
+  function resetActiveTrip() {
+    if (!window.confirm(`Reset ${activeTrip.title} back to default data?`)) return;
+    const nextTrip = activeTrip.id === "japan-2026" ? buildJapanTrip() : peruTrip;
+    setState((current) => ({
+      ...current,
+      trips: { ...current.trips, [activeTrip.id]: nextTrip },
+      japanBranch: activeTrip.id === "japan-2026" ? "hokkaido" : current.japanBranch,
+    }));
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -408,18 +553,12 @@ function App() {
     updateActivity(id, { day });
   }
 
-  async function copyText(text: string) {
-    await navigator.clipboard.writeText(text);
-    setSaveStatus("Copied to clipboard");
-  }
-
-  function downloadCsv(exportActivities = activeActivities) {
-    const rows = makeExportRows(exportActivities);
+  function downloadCsv(rows = exportRows(filteredActivities)) {
     const blob = new Blob([rowsToCsv(rows)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `japan-${branch}-maps-export.csv`;
+    anchor.download = `${activeTrip.id}-google-maps-export.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -427,27 +566,25 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="skip-link" href="#main-content">Skip to planner</a>
-        <div>
-          <p className="eyebrow">September 1-30, 2026</p>
-          <h1>Japan trip planner</h1>
+        <a className="skip-link" href="#main-content">Skip to itinerary</a>
+        <div className="brand-block">
+          <p className="eyebrow">Local-first travel command center</p>
+          <h1>Itinerary Mate</h1>
+          <p>{activeTrip.description}</p>
         </div>
         <div className="topbar-actions">
+          <TripSwitcher activeTripId={state.activeTripId} setActiveTripId={(activeTripId) => updateState({ activeTripId })} />
+          <ThemeToggle preference={state.themePreference} resolvedTheme={resolvedTheme} setPreference={(themePreference) => updateState({ themePreference })} />
           <span className="save-pill"><BadgeCheck size={16} aria-hidden="true" /> {saveStatus}</span>
-          <button className="ghost-button" type="button" onClick={resetPlanner}>
-            <RotateCcw size={17} aria-hidden="true" /> Reset
+          <button className="ghost-button" type="button" onClick={resetActiveTrip}>
+            <RotateCcw size={17} aria-hidden="true" /> Reset trip
           </button>
         </div>
       </header>
 
       <nav className="nav-tabs" aria-label="Planner sections">
         {navItems.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={activeView === item.id ? "active" : ""}
-            onClick={() => setActiveView(item.id)}
-          >
+          <button key={item.id} type="button" className={activeView === item.id ? "active" : ""} onClick={() => setActiveView(item.id)}>
             {item.label}
           </button>
         ))}
@@ -458,39 +595,36 @@ function App() {
           <section className="card route-card">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Route</p>
-                <h2>30-day shape</h2>
+                <p className="eyebrow">{formatDate(activeTrip.startDate)} to {formatDate(activeTrip.endDate)}</p>
+                <h2>{activeTrip.title}</h2>
               </div>
-              <Train size={20} aria-hidden="true" />
+              <MapIcon size={20} aria-hidden="true" />
             </div>
             <div className="route-strip" aria-label="Trip route">
-              {["Tokyo", "Fuji", "Kyoto", "Osaka", "Hiroshima", "Kanazawa", branch === "hokkaido" ? "Hokkaido" : "Kyushu", "Tokyo"].map((stop) => (
-                <span key={stop}>{stop}</span>
+              {Array.from(new Set(allVisibleActivities.map((activity) => activity.city))).slice(0, 8).map((city) => (
+                <span key={city}>{city}</span>
               ))}
             </div>
-            <BranchToggle branch={branch} setBranch={setBranch} cadToJpy={cadToJpy} />
+            {activeTrip.id === "japan-2026" && (
+              <BranchToggle branch={state.japanBranch} setBranch={(japanBranch) => updateState({ japanBranch })} cadToJpy={state.japanCadToJpy} />
+            )}
           </section>
 
           <section className="card quick-card">
             <p className="eyebrow">Rough total</p>
-            <strong>{formatJpy(budget.total.mid)}</strong>
-            <span>{formatCad(budget.total.mid, cadToJpy)} mid estimate</span>
+            <strong>{formatMoney(budget.total.mid, activeTrip.currency, state.japanCadToJpy)}</strong>
+            <span>Low {formatMoney(budget.total.low, activeTrip.currency, state.japanCadToJpy)}. High {formatMoney(budget.total.high, activeTrip.currency, state.japanCadToJpy)}.</span>
             <label className="field compact-field">
               <span>Planning rate</span>
-              <input
-                type="number"
-                min="1"
-                value={cadToJpy}
-                onChange={(event) => setCadToJpy(Math.max(1, Number(event.target.value)))}
-              />
-              <small>JPY per 1 CAD</small>
+              <input type="number" min="1" value={state.japanCadToJpy} onChange={(event) => updateState({ japanCadToJpy: Math.max(1, Number(event.target.value)) })} />
+              <small>JPY per 1 CAD, rough planning only</small>
             </label>
           </section>
 
           <section className="card quick-card">
-            <p className="eyebrow">Pacing</p>
-            <strong>{tooPackedDays.length ? `${tooPackedDays.length} tight days` : "No tight days"}</strong>
-            <span>{tooPackedDays.length ? `Check days ${tooPackedDays.join(", ")}` : "The default route has breathing room."}</span>
+            <p className="eyebrow">Offline</p>
+            <strong>Installable PWA</strong>
+            <span>Core app and saved edits work offline. External images and live data may not.</span>
           </section>
         </aside>
 
@@ -502,69 +636,78 @@ function App() {
             setSelectedCategory={setSelectedCategory}
             selectedCity={selectedCity}
             setSelectedCity={setSelectedCity}
+            selectedDay={selectedDay}
+            setSelectedDay={setSelectedDay}
             cities={cities}
+            days={dayOptions}
             addActivity={addActivity}
+            addRestDay={addRestDay}
           />
 
-          {activeView === "overview" && (
-            <Overview
-              activities={activeActivities}
+          {activeView === "dashboard" && (
+            <Dashboard
+              trip={activeTrip}
+              activities={allVisibleActivities}
               budget={budget}
-              branch={branch}
-              setBranch={setBranch}
-              cadToJpy={cadToJpy}
-              nextEditableDay={nextEditableDay}
+              cadToJpy={state.japanCadToJpy}
+              routeSuggestions={routeSuggestions}
             />
           )}
 
           {activeView === "itinerary" && (
             <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-            <ItineraryTimeline
-              activities={filteredActivities}
-              allActivities={activeActivities}
-              cadToJpy={cadToJpy}
-              updateActivity={updateActivity}
-              deleteActivity={deleteActivity}
-              expandedId={expandedId}
-              setExpandedId={setExpandedId}
-              brokenImageIds={brokenImageIds}
-              markImageBroken={(id) => setBrokenImageIds((current) => new Set(current).add(id))}
-            />
-          </DndContext>
+              <ItineraryTimeline
+                days={days}
+                activities={filteredActivities}
+                expandedId={expandedId}
+                setExpandedId={setExpandedId}
+                updateActivity={updateActivity}
+                deleteActivity={deleteActivity}
+                brokenImageIds={brokenImageIds}
+                setBrokenImageIds={setBrokenImageIds}
+                trip={activeTrip}
+                cadToJpy={state.japanCadToJpy}
+              />
+            </DndContext>
           )}
 
           {activeView === "places" && (
             <PlaceBrowser
               activities={filteredActivities}
-              cadToJpy={cadToJpy}
-              updateActivity={updateActivity}
-              deleteActivity={deleteActivity}
               expandedId={expandedId}
               setExpandedId={setExpandedId}
+              updateActivity={updateActivity}
+              deleteActivity={deleteActivity}
               brokenImageIds={brokenImageIds}
-              markImageBroken={(id) => setBrokenImageIds((current) => new Set(current).add(id))}
+              setBrokenImageIds={setBrokenImageIds}
+              trip={activeTrip}
+              cadToJpy={state.japanCadToJpy}
             />
           )}
 
           {activeView === "budget" && (
-            <BudgetDashboard
-              activities={activeActivities}
-              budget={budget}
-              cadToJpy={cadToJpy}
-              stayAreas={stayAreas.filter((stay) => !stay.branch || stay.branch === branch)}
-              setStayAreas={setStayAreas}
-              branch={branch}
-            />
+            <BudgetDashboard trip={activeTrip} activities={allVisibleActivities} budget={budget} updateActivity={updateActivity} cadToJpy={state.japanCadToJpy} />
+          )}
+
+          {activeView === "logistics" && (
+            <LogisticsPanel trip={activeTrip} updateHotel={updateHotel} routeSuggestions={routeSuggestions} />
           )}
 
           {activeView === "maps" && (
             <MapsExport
+              trip={activeTrip}
               activities={filteredActivities}
-              allActivities={activeActivities}
-              cadToJpy={cadToJpy}
-              copyText={copyText}
+              allActivities={allVisibleActivities}
+              copyRows={async (rows) => {
+                await copyText(rows.map((row) => `${row.place} | ${row.address || row.query} | Day ${row.day} | ${row.category} | ${row.notes}`).join("\n"));
+                setSaveStatus("Copied Google Maps rows");
+              }}
               downloadCsv={downloadCsv}
             />
+          )}
+
+          {activeView === "assistant" && (
+            <AssistantPanel trip={activeTrip} activities={allVisibleActivities} routeSuggestions={routeSuggestions} />
           )}
         </div>
       </main>
@@ -572,475 +715,354 @@ function App() {
   );
 }
 
-function FilterBar({
-  query,
-  setQuery,
-  selectedCategory,
-  setSelectedCategory,
-  selectedCity,
-  setSelectedCity,
-  cities,
-  addActivity,
-}: {
-  query: string;
-  setQuery: (value: string) => void;
-  selectedCategory: Category | "All";
-  setSelectedCategory: (value: Category | "All") => void;
-  selectedCity: string;
-  setSelectedCity: (value: string) => void;
-  cities: string[];
-  addActivity: () => void;
-}) {
-  return (
-    <section className="filter-bar" aria-label="Planner filters">
-      <label className="search-field">
-        <Search size={18} aria-hidden="true" />
-        <span className="sr-only">Search itinerary</span>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search places, notes, cities" />
-      </label>
-      <div className="chip-scroll" aria-label="Category filters">
-        {(["All", ...categories] as Array<Category | "All">).map((category) => (
-          <button
-            key={category}
-            type="button"
-            className={selectedCategory === category ? "chip active" : "chip"}
-            onClick={() => setSelectedCategory(category)}
-          >
-            {category}
-          </button>
-        ))}
-      </div>
-      <label className="select-field">
-        <span>City</span>
-        <select value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
-          {cities.map((city) => (
-            <option key={city} value={city}>{city}</option>
-          ))}
-        </select>
-      </label>
-      <button className="primary-button" type="button" onClick={addActivity}>
-        <Plus size={18} aria-hidden="true" /> Add
-      </button>
-    </section>
-  );
+function makeBudget(trip: Trip, activities: TripActivity[]) {
+  const attractions = sumRanges(activities.filter((activity) => !["Flight", "Hotel", "Transit"].includes(activity.category)).map(activityRange));
+  const transport = sumRanges(activities.filter((activity) => ["Flight", "Transit"].includes(activity.category)).map(activityRange));
+  const lodging = sumRanges(trip.hotels.map((hotel) => ({ low: hotel.estimatedCost, mid: hotel.estimatedCost, high: hotel.estimatedCost })));
+  const food = sumRanges(activities.filter((activity) => activity.category === "Food").map(activityRange));
+  const misc = sumRanges(activities.filter((activity) => ["Extra", "Note", "Attachment"].includes(activity.category)).map(activityRange));
+  const total = sumRanges([attractions, transport, lodging, food, misc]);
+  const byCity = activities.reduce<Record<string, BudgetRange>>((acc, activity) => {
+    acc[activity.city] ||= { low: 0, mid: 0, high: 0 };
+    const range = activityRange(activity);
+    acc[activity.city].low += range.low;
+    acc[activity.city].mid += range.mid;
+    acc[activity.city].high += range.high;
+    return acc;
+  }, {});
+  return { total, categories: { lodging, food, transport, attractions, "shopping/miscellaneous": misc }, byCity };
 }
 
-function Overview({
-  activities,
-  budget,
-  branch,
-  setBranch,
-  cadToJpy,
-  nextEditableDay,
-}: {
-  activities: Activity[];
-  budget: ReturnType<typeof useAppBudget>;
-  branch: TripBranch;
-  setBranch: (branch: TripBranch) => void;
-  cadToJpy: number;
-  nextEditableDay: number;
-}) {
-  const mustCount = activities.filter((activity) => activity.category === "Must See" || activity.category === "Non-Negotiable").length;
-  return (
-    <div className="view-stack">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <p className="eyebrow">Premium editable planner</p>
-          <h2>One month in Japan, built around the reasons people actually go.</h2>
-          <p>
-            A route that starts big in Tokyo, slows down around Fuji, gives Kyoto real time, eats properly in Osaka,
-            and keeps the final week flexible.
-          </p>
-        </div>
-        <div className="hero-stats">
-          <Stat label="Mid budget" value={formatJpy(budget.total.mid)} note={formatCad(budget.total.mid, cadToJpy)} />
-          <Stat label="Core items" value={String(mustCount)} note="Must See + Non-Negotiable" />
-          <Stat label="Next edit" value={`Day ${nextEditableDay}`} note="First incomplete day" />
-        </div>
-      </section>
-
-      <section className="anchor-grid">
-        {tripAnchors.map((anchor) => (
-          <article className="anchor-card" key={anchor.title}>
-            <Sparkles size={18} aria-hidden="true" />
-            <h3>{anchor.title}</h3>
-            <p>{anchor.body}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Trip buckets</p>
-            <h2>What this planner protects</h2>
-          </div>
-        </div>
-        <div className="bucket-grid">
-          {reasonBuckets.map((bucket) => (
-            <article key={bucket.title} className="bucket-card">
-              <h3>{bucket.title}</h3>
-              <div className="mini-tags">
-                {bucket.items.map((item) => <span key={item}>{item}</span>)}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Itinerary comparison</p>
-            <h2>Hokkaido or Kyushu</h2>
-          </div>
-        </div>
-        <ComparisonCards branch={branch} setBranch={setBranch} cadToJpy={cadToJpy} />
-      </section>
-    </div>
-  );
+function makeRouteSuggestions(trip: Trip, activities: TripActivity[]): RouteSuggestion[] {
+  const suggestions: RouteSuggestion[] = trip.id === "peru-2026" ? [...peruRouteSuggestions] : [];
+  const grouped = activities.reduce<Record<number, TripActivity[]>>((acc, activity) => {
+    acc[activity.day] ||= [];
+    acc[activity.day].push(activity);
+    return acc;
+  }, {});
+  Object.entries(grouped).forEach(([dayKey, items]) => {
+    const day = Number(dayKey);
+    const pacing = dayScore(items);
+    if (pacing.tone === "danger") {
+      suggestions.push({
+        id: `${trip.id}-packed-${day}`,
+        tripId: trip.id,
+        day,
+        severity: "warning",
+        title: `Day ${day} is crowded`,
+        detail: "Move one lower-priority stop or protect a longer break between transfers.",
+      });
+    }
+    const cities = Array.from(new Set(items.map((item) => item.city)));
+    if (cities.length >= 3) {
+      suggestions.push({
+        id: `${trip.id}-city-hop-${day}`,
+        tripId: trip.id,
+        day,
+        severity: "warning",
+        title: `Day ${day} crosses several bases`,
+        detail: `This day touches ${cities.join(", ")}. Group nearby stops or make one city the anchor.`,
+      });
+    }
+  });
+  if (trip.id === "japan-2026") {
+    suggestions.push({
+      id: "japan-routing-future-api",
+      tripId: trip.id,
+      severity: "info",
+      title: "Future live routing hook",
+      detail: "This is heuristic only. A Google Maps or Mapbox service can later replace these suggestions with live travel times.",
+    });
+  }
+  return suggestions;
 }
 
-function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+function TripSwitcher({ activeTripId, setActiveTripId }: { activeTripId: TripId; setActiveTripId: (id: TripId) => void }) {
   return (
-    <div className="stat-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{note}</small>
-    </div>
-  );
-}
-
-function BranchToggle({ branch, setBranch, cadToJpy }: { branch: TripBranch; setBranch: (branch: TripBranch) => void; cadToJpy: number }) {
-  return (
-    <div className="branch-toggle" role="group" aria-label="Choose final trip extension">
-      <button type="button" className={branch === "hokkaido" ? "active" : ""} onClick={() => setBranch("hokkaido")}>
-        Hokkaido
-        <span>{moneyRange(44000, 79000, 135000, cadToJpy)}</span>
-      </button>
-      <button type="button" className={branch === "kyushu" ? "active" : ""} onClick={() => setBranch("kyushu")}>
-        Kyushu
-        <span>{moneyRange(45000, 80000, 139000, cadToJpy)}</span>
-      </button>
-    </div>
-  );
-}
-
-function ComparisonCards({ branch, setBranch, cadToJpy }: { branch: TripBranch; setBranch: (branch: TripBranch) => void; cadToJpy: number }) {
-  const options = [
-    {
-      id: "hokkaido" as TripBranch,
-      title: "Hokkaido",
-      pitch: "Cooler air, Sapporo food, Otaru water, and a more spacious finish.",
-      tradeoffs: ["Best weather relief", "More flight-dependent", "Countryside day can run long"],
-      cost: [44000, 79000, 135000],
-    },
-    {
-      id: "kyushu" as TripBranch,
-      title: "Kyushu",
-      pitch: "Fukuoka nights, ramen, onsen-town options, and a warmer southern ending.",
-      tradeoffs: ["Food-focused and easy at night", "Warmer and more humid", "Yufuin works better overnight"],
-      cost: [45000, 80000, 139000],
-    },
-  ];
-
-  return (
-    <div className="comparison-grid">
-      {options.map((option) => (
-        <article key={option.id} className={branch === option.id ? "compare-card active" : "compare-card"}>
-          <div>
-            <p className="eyebrow">Days 25-28</p>
-            <h3>{option.title}</h3>
-            <p>{option.pitch}</p>
-          </div>
-          <ul>
-            {option.tradeoffs.map((tradeoff) => <li key={tradeoff}>{tradeoff}</li>)}
-          </ul>
-          <div className="compare-footer">
-            <span>{moneyRange(option.cost[0], option.cost[1], option.cost[2], cadToJpy)}</span>
-            <button type="button" onClick={() => setBranch(option.id)}>
-              {branch === option.id ? "Selected" : "Choose"}
-            </button>
-          </div>
-        </article>
+    <div className="trip-switcher" aria-label="Trip switcher">
+      {tripOrder.map((tripId) => (
+        <button key={tripId} type="button" className={activeTripId === tripId ? "active" : ""} onClick={() => setActiveTripId(tripId)}>
+          {tripId === "japan-2026" ? "Japan Trip" : "Peru Trip"}
+        </button>
       ))}
     </div>
   );
 }
 
-function ItineraryTimeline({
-  activities,
-  allActivities,
-  cadToJpy,
-  updateActivity,
-  deleteActivity,
-  expandedId,
-  setExpandedId,
-  brokenImageIds,
-  markImageBroken,
-}: {
-  activities: Activity[];
-  allActivities: Activity[];
-  cadToJpy: number;
-  updateActivity: (id: string, patch: Partial<Activity>) => void;
-  deleteActivity: (id: string) => void;
-  expandedId: string | null;
-  setExpandedId: (id: string | null) => void;
-  brokenImageIds: Set<string>;
-  markImageBroken: (id: string) => void;
-}) {
-  if (!activities.length) return <EmptyState title="No itinerary matches" body="Try clearing a filter or add a custom activity." />;
-
+function ThemeToggle({ preference, resolvedTheme, setPreference }: { preference: ThemePreference; resolvedTheme: string; setPreference: (preference: ThemePreference) => void }) {
+  const next = preference === "system" ? "dark" : preference === "dark" ? "light" : "system";
   return (
-    <div className="timeline">
-      {days.map((day) => {
-        const dayActivities = activities.filter((activity) => activity.day === day);
-        const allDayActivities = allActivities.filter((activity) => activity.day === day);
-        return (
-          <DayColumn
-            key={day}
-            day={day}
-            activities={dayActivities}
-            allDayActivities={allDayActivities}
-            cadToJpy={cadToJpy}
-            updateActivity={updateActivity}
-            deleteActivity={deleteActivity}
-            expandedId={expandedId}
-            setExpandedId={setExpandedId}
-            brokenImageIds={brokenImageIds}
-            markImageBroken={markImageBroken}
-          />
-        );
-      })}
+    <button className="ghost-button" type="button" onClick={() => setPreference(next)} title="Toggle theme">
+      {resolvedTheme === "dark" ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}
+      {preference === "system" ? "System" : preference}
+    </button>
+  );
+}
+
+function BranchToggle({ branch, setBranch, cadToJpy }: { branch: TripBranch; setBranch: (branch: TripBranch) => void; cadToJpy: number }) {
+  return (
+    <div className="branch-toggle">
+      <div className="branch-copy">
+        <p className="eyebrow">Days 25-28 branch</p>
+        <strong>{branch === "hokkaido" ? "Hokkaido: cooler, big landscapes" : "Kyushu: onsen, food, warmer weather"}</strong>
+        <span>Rough budget remains shown in JPY and CAD at {cadToJpy} JPY per CAD.</span>
+      </div>
+      <div className="button-row">
+        <button type="button" className={branch === "hokkaido" ? "active" : ""} onClick={() => setBranch("hokkaido")}>Hokkaido</button>
+        <button type="button" className={branch === "kyushu" ? "active" : ""} onClick={() => setBranch("kyushu")}>Kyushu</button>
+      </div>
     </div>
   );
 }
 
-function DayColumn({
-  day,
-  activities,
-  allDayActivities,
-  cadToJpy,
-  updateActivity,
-  deleteActivity,
-  expandedId,
-  setExpandedId,
-  brokenImageIds,
-  markImageBroken,
-}: {
-  day: number;
-  activities: Activity[];
-  allDayActivities: Activity[];
-  cadToJpy: number;
-  updateActivity: (id: string, patch: Partial<Activity>) => void;
-  deleteActivity: (id: string) => void;
-  expandedId: string | null;
-  setExpandedId: (id: string | null) => void;
-  brokenImageIds: Set<string>;
-  markImageBroken: (id: string) => void;
+function FilterBar(props: {
+  query: string;
+  setQuery: (query: string) => void;
+  selectedCategory: TripCategory | "All";
+  setSelectedCategory: (category: TripCategory | "All") => void;
+  selectedCity: string;
+  setSelectedCity: (city: string) => void;
+  selectedDay: number | "All";
+  setSelectedDay: (day: number | "All") => void;
+  cities: string[];
+  days: Array<number | "All">;
+  addActivity: () => void;
+  addRestDay: () => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
-  const pacing = getDayPacing(allDayActivities);
-  const budget = sumBudget(allDayActivities.map((activity) => ({
-    low: activity.estimatedCostLow,
-    mid: activity.estimatedCostMid,
-    high: activity.estimatedCostHigh,
-  })));
-
   return (
-    <section ref={setNodeRef} className={isOver ? "day-column is-over" : "day-column"}>
-      <div className="day-header">
-        <div>
-          <p className="eyebrow">Day {day}</p>
-          <h2>{allDayActivities[0]?.city ?? "Rest / buffer"}</h2>
-        </div>
-        <div className={`pacing-pill ${pacing.tone}`}>
-          {pacing.tone === "danger" && <TriangleAlert size={15} aria-hidden="true" />}
-          {pacing.label}
-        </div>
+    <section className="filter-bar" aria-label="Trip filters">
+      <label className="search-field">
+        <Search size={18} aria-hidden="true" />
+        <input value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="Search places, notes, addresses" />
+      </label>
+      <div className="chip-row" aria-label="Category filters">
+        {(["All", ...categoryOptions] as Array<TripCategory | "All">).map((category) => (
+          <button key={category} className={props.selectedCategory === category ? "chip active" : "chip"} type="button" onClick={() => props.setSelectedCategory(category)}>
+            {category}
+          </button>
+        ))}
       </div>
-      <div className="day-meta">
-        <span>{formatJpy(budget.mid)} mid</span>
-        <span>{formatCad(budget.mid, cadToJpy)}</span>
-        <span>{allDayActivities.length} items</span>
+      <div className="filter-selects">
+        <label className="field">
+          <span>City</span>
+          <select value={props.selectedCity} onChange={(event) => props.setSelectedCity(event.target.value)}>
+            {props.cities.map((city) => <option key={city}>{city}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>Day</span>
+          <select value={props.selectedDay} onChange={(event) => props.setSelectedDay(event.target.value === "All" ? "All" : Number(event.target.value))}>
+            {props.days.map((day) => <option key={day} value={day}>{day === "All" ? "All days" : `Day ${day}`}</option>)}
+          </select>
+        </label>
+        <button className="primary-button" type="button" onClick={props.addActivity}><Plus size={17} aria-hidden="true" /> Add</button>
+        <button className="ghost-button" type="button" onClick={props.addRestDay}><CalendarDays size={17} aria-hidden="true" /> Rest day</button>
       </div>
-      {pacing.tone === "danger" && (
-        <p className="warning-copy">This day is likely too packed. Move one item or add a rest block.</p>
-      )}
-      {activities.length ? (
-        <div className="activity-list">
-          {activities.map((activity) => (
-            <DraggableActivityCard
-              key={activity.id}
-              activity={activity}
-              cadToJpy={cadToJpy}
-              updateActivity={updateActivity}
-              deleteActivity={deleteActivity}
-              expanded={expandedId === activity.id}
-              setExpanded={(open) => setExpandedId(open ? activity.id : null)}
-              brokenImageIds={brokenImageIds}
-              markImageBroken={markImageBroken}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="empty-day">
-          <CalendarDays size={18} aria-hidden="true" />
-          <span>{allDayActivities.length ? "Hidden by filters" : "Open rest space"}</span>
-        </div>
-      )}
     </section>
   );
 }
 
-function DraggableActivityCard(props: ActivityCardProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: props.activity.id });
-  const style = { transform: CSS.Translate.toString(transform) };
+function Dashboard({ trip, activities, budget, cadToJpy, routeSuggestions }: { trip: Trip; activities: TripActivity[]; budget: ReturnType<typeof makeBudget>; cadToJpy: number; routeSuggestions: RouteSuggestion[] }) {
+  const booked = activities.filter((activity) => activity.isBooked).length + trip.flights.filter((flight) => flight.status === "booked" || flight.status === "manual / not live yet").length;
+  const incomplete = activities.filter((activity) => !activity.isCompleted).length;
+  const nextFlight = trip.flights.find((flight) => new Date(flight.departureTime).getTime() >= Date.now()) || trip.flights[0];
+  const nextHotel = trip.hotels[0];
+  const totalDays = Math.max(...activities.map((activity) => activity.day), 1);
   return (
-    <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
-      <ActivityCard {...props} dragHandleProps={{ ...attributes, ...listeners }} />
-    </div>
+    <section className="content-section">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Trip dashboard</p>
+          <h2>{trip.title}</h2>
+        </div>
+        <Sparkles size={22} aria-hidden="true" />
+      </div>
+      <div className="dashboard-grid">
+        <MetricCard label="Days" value={String(totalDays)} detail={`${formatDate(trip.startDate)} to ${formatDate(trip.endDate)}`} icon={<CalendarDays size={18} />} />
+        <MetricCard label="Rough estimate" value={formatMoney(budget.total.mid, trip.currency, cadToJpy)} detail="Editable, local-first budget" icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="Booked items" value={String(booked)} detail="Includes manual flight records" icon={<BadgeCheck size={18} />} />
+        <MetricCard label="Incomplete" value={String(incomplete)} detail="Activities still open" icon={<CheckCircle2 size={18} />} />
+        <MetricCard label="Next flight" value={nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : "Add flight"} detail={nextFlight ? `${nextFlight.departureAirport} to ${nextFlight.arrivalAirport}` : "Manual tracker ready"} icon={<Plane size={18} />} />
+        <MetricCard label="Next hotel" value={nextHotel?.name || "Add hotel"} detail={nextHotel ? `${nextHotel.city}, ${nextHotel.country}` : "Lodging tracker ready"} icon={<Hotel size={18} />} />
+      </div>
+
+      {trip.id === "japan-2026" ? (
+        <div className="overview-grid">
+          {tripAnchors.map((anchor) => (
+            <article className="anchor-card" key={anchor.title}>
+              <h3>{anchor.title}</h3>
+              <p>{anchor.body}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="overview-grid">
+          {["Altitude first", "Sacred Valley", "Machu Picchu", "Arequipa and Colca", "Coast reset", "Lima buffer"].map((title) => (
+            <article className="anchor-card" key={title}>
+              <h3>{title}</h3>
+              <p>{peruAnchorCopy(title)}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <SuggestionList suggestions={routeSuggestions.slice(0, 4)} />
+    </section>
   );
 }
 
-interface ActivityCardProps {
-  activity: Activity;
-  cadToJpy: number;
-  updateActivity: (id: string, patch: Partial<Activity>) => void;
-  deleteActivity: (id: string) => void;
-  expanded: boolean;
-  setExpanded: (open: boolean) => void;
-  dragHandleProps?: Record<string, unknown>;
-  brokenImageIds: Set<string>;
-  markImageBroken: (id: string) => void;
+function peruAnchorCopy(title: string) {
+  const copy: Record<string, string> = {
+    "Altitude first": "Cusco starts the trip high, so the first night should stay quiet.",
+    "Sacred Valley": "Pisac, Moray, Maras, and Ollantaytambo make the mountain rhythm click.",
+    "Machu Picchu": "This is the anchor day. Protect the timing and keep the rest simple.",
+    "Arequipa and Colca": "White-stone city time, then a canyon overnight.",
+    "Coast reset": "Paracas and Huacachina give the trip a totally different texture.",
+    "Lima buffer": "A flexible final day for food, packing, and getting home without chaos.",
+  };
+  return copy[title];
 }
 
-function ActivityCard({ activity, cadToJpy, updateActivity, deleteActivity, expanded, setExpanded, dragHandleProps, brokenImageIds, markImageBroken }: ActivityCardProps) {
-  const theme = placeholderThemes[Math.abs(activity.id.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % placeholderThemes.length];
-  const hasImage = Boolean(activity.imageUrl && !brokenImageIds.has(activity.id));
-
+function MetricCard({ label, value, detail, icon }: { label: string; value: string; detail: string; icon: ReactNode }) {
   return (
-    <article className={`place-card ${activity.isCompleted ? "completed" : ""}`}>
-      <div className={hasImage ? "place-media has-image" : "place-media generated"} style={hasImage ? undefined : { background: theme }}>
-        {hasImage ? (
-          <img
-            src={activity.imageUrl}
-            alt={activity.imageAlt || activity.title}
-            loading="lazy"
-            onError={() => markImageBroken(activity.id)}
-          />
-        ) : (
-          <div className="generated-visual" aria-label={activity.imageAlt || `Generated visual for ${activity.title}`}>
-            <MapPin size={28} aria-hidden="true" />
-            <span>{activity.imageSearchQuery || activity.city}</span>
-          </div>
-        )}
-        <span className="media-overlay">{activity.city}</span>
+    <article className="metric-card">
+      <div className="metric-icon">{icon}</div>
+      <p className="eyebrow">{label}</p>
+      <strong>{value}</strong>
+      <span>{detail}</span>
+    </article>
+  );
+}
+
+function ItineraryTimeline(props: {
+  days: number[];
+  activities: TripActivity[];
+  expandedId: string | null;
+  setExpandedId: (id: string | null) => void;
+  updateActivity: (id: string, patch: Partial<TripActivity>) => void;
+  deleteActivity: (id: string) => void;
+  brokenImageIds: Set<string>;
+  setBrokenImageIds: (ids: Set<string>) => void;
+  trip: Trip;
+  cadToJpy: number;
+}) {
+  return (
+    <section className="timeline content-section">
+      {props.days.map((day) => {
+        const dayActivities = props.activities.filter((activity) => activity.day === day);
+        const pacing = dayScore(dayActivities);
+        return (
+          <DayDropZone key={day} day={day}>
+            <div className="day-header">
+              <div>
+                <p className="eyebrow">Day {day}</p>
+                <h2>{dayActivities[0]?.city || "Open day"}</h2>
+              </div>
+              <div className="day-meta">
+                <span className={`pacing-pill ${pacing.tone}`}>{pacing.label}</span>
+                <span>{formatMoney(sumRanges(dayActivities.map(activityRange)).mid, props.trip.currency, props.cadToJpy)}</span>
+              </div>
+            </div>
+            {dayActivities.length ? (
+              <div className="activity-grid">
+                {dayActivities.map((activity) => (
+                  <ActivityCard key={activity.id} activity={activity} {...props} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="No plans on this day" body="Add a rest block or move a lower-priority activity here." />
+            )}
+          </DayDropZone>
+        );
+      })}
+    </section>
+  );
+}
+
+function DayDropZone({ day, children }: { day: number; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
+  return <article ref={setNodeRef} className={isOver ? "day-card drop-active" : "day-card"}>{children}</article>;
+}
+
+function ActivityCard({
+  activity,
+  expandedId,
+  setExpandedId,
+  updateActivity,
+  deleteActivity,
+  brokenImageIds,
+  setBrokenImageIds,
+  trip,
+  cadToJpy,
+}: {
+  activity: TripActivity;
+  expandedId: string | null;
+  setExpandedId: (id: string | null) => void;
+  updateActivity: (id: string, patch: Partial<TripActivity>) => void;
+  deleteActivity: (id: string) => void;
+  brokenImageIds: Set<string>;
+  setBrokenImageIds: (ids: Set<string>) => void;
+  trip: Trip;
+  cadToJpy: number;
+}) {
+  const expanded = expandedId === activity.id;
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: activity.id });
+  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
+  const hasImage = activity.imageUrl && !activity.imageUrl.startsWith("linear-gradient") && !brokenImageIds.has(activity.id);
+  return (
+    <article className={activity.isCompleted ? "place-card completed" : "place-card"} ref={setNodeRef} style={style}>
+      <div className="card-image" style={{ background: hasImage ? undefined : activity.imageUrl || placeholderFor(activity.title) }}>
+        {hasImage && <img src={activity.imageUrl} alt={activity.imageAlt || activity.title} loading="lazy" onError={() => setBrokenImageIds(new Set([...brokenImageIds, activity.id]))} />}
+        <button className="drag-handle" type="button" {...listeners} {...attributes} aria-label={`Drag ${activity.title}`}>
+          <GripVertical size={16} aria-hidden="true" />
+        </button>
+        <span className="category-badge">{activity.category}</span>
       </div>
-      <div className="place-body">
-        <div className="place-title-row">
-          <button className="drag-handle" type="button" aria-label={`Drag ${activity.title}`} {...dragHandleProps}>
-            <GripVertical size={18} aria-hidden="true" />
-          </button>
+      <div className="card-body">
+        <div className="card-title-row">
           <div>
-            <p className="eyebrow">Day {activity.day} · {activity.city}</p>
+            <p className="eyebrow">{activity.city}{activity.date ? ` | ${formatDate(activity.date)}` : ""}</p>
             <h3>{activity.title}</h3>
           </div>
-          <button className="icon-button" type="button" onClick={() => setExpanded(!expanded)} aria-label={expanded ? "Collapse activity" : "Expand activity"}>
-            <ChevronDown className={expanded ? "chevron open" : "chevron"} size={19} aria-hidden="true" />
+          <button className="icon-button" type="button" onClick={() => setExpandedId(expanded ? null : activity.id)} aria-expanded={expanded}>
+            <ChevronDown size={17} aria-hidden="true" />
           </button>
         </div>
         <p>{activity.description}</p>
         <div className="meta-chips">
-          <span>{activity.category}</span>
-          <span>Booking {activity.bookingRequired}</span>
-          <span>{activity.energyLevel}</span>
+          <span><CircleDollarSign size={14} /> {formatMoney(activity.estimatedCost, activity.currency, cadToJpy)}</span>
+          <span><MapPin size={14} /> {activity.travelTimeFromPrevious || "Add travel time"}</span>
+          <span><BadgeCheck size={14} /> {activity.isBooked ? "Booked" : "Not booked"}</span>
+          <span><Sparkles size={14} /> Priority {activity.priority}</span>
         </div>
-        <div className="quick-facts">
-          <span><CircleDollarSign size={15} aria-hidden="true" /> {formatJpy(activity.estimatedCostMid)} / {formatCad(activity.estimatedCostMid, cadToJpy)}</span>
-          <span><Train size={15} aria-hidden="true" /> {activity.travelTimeFromBase}</span>
-        </div>
-        <div className="card-actions">
-          <button type="button" className={activity.isBooked ? "toggle active" : "toggle"} onClick={() => updateActivity(activity.id, { isBooked: !activity.isBooked })}>
-            <BadgeCheck size={16} aria-hidden="true" /> {activity.isBooked ? "Booked" : "Book"}
-          </button>
-          <button type="button" className={activity.isCompleted ? "toggle active" : "toggle"} onClick={() => updateActivity(activity.id, { isCompleted: !activity.isCompleted })}>
-            <CheckCircle2 size={16} aria-hidden="true" /> {activity.isCompleted ? "Done" : "Done"}
-          </button>
-          <span className="budget-mini">{activity.visitDuration} · Priority {activity.priority}</span>
-        </div>
-
         {expanded && (
           <div className="expanded-panel">
-            <div className="detail-grid">
-              <InfoTile icon={<CircleDollarSign size={17} />} label="Rough budget" value={moneyRange(activity.estimatedCostLow, activity.estimatedCostMid, activity.estimatedCostHigh, cadToJpy)} />
-              <InfoTile icon={<Train size={17} />} label="Travel from base" value={activity.travelTimeFromBase} />
-              <InfoTile icon={<CloudRain size={17} />} label="Weather backup" value={activity.weatherSensitive ? activity.backupOption : "Not weather-sensitive"} />
-              <InfoTile icon={<MapIcon size={17} />} label="Maps query" value={activity.googleMapsQuery} />
+            <div className="edit-grid">
+              <label className="field"><span>Title</span><input value={activity.title} onChange={(event) => updateActivity(activity.id, { title: event.target.value })} /></label>
+              <label className="field"><span>City</span><input value={activity.city} onChange={(event) => updateActivity(activity.id, { city: event.target.value })} /></label>
+              <label className="field"><span>Day</span><input type="number" min="1" value={activity.day} onChange={(event) => updateActivity(activity.id, { day: Math.max(1, Number(event.target.value)) })} /></label>
+              <label className="field"><span>Category</span><select value={activity.category} onChange={(event) => updateActivity(activity.id, { category: event.target.value as TripCategory })}>{categoryOptions.map((category) => <option key={category}>{category}</option>)}</select></label>
+              <label className="field"><span>Cost</span><input type="number" min="0" value={activity.estimatedCost} onChange={(event) => updateActivity(activity.id, { estimatedCost: Number(event.target.value) })} /></label>
+              <label className="field"><span>Duration</span><input value={activity.duration} onChange={(event) => updateActivity(activity.id, { duration: event.target.value })} /></label>
+              <label className="field"><span>Travel time</span><input value={activity.travelTimeFromPrevious || ""} onChange={(event) => updateActivity(activity.id, { travelTimeFromPrevious: event.target.value })} /></label>
+              <label className="field"><span>Image URL</span><input value={activity.imageUrl} onChange={(event) => updateActivity(activity.id, { imageUrl: event.target.value })} /></label>
             </div>
-            {(activity.imageCredit || activity.imageSearchQuery) && (
-              <div className="image-credit">
-                {activity.imageCredit ? (
-                  <span>
-                    Image: {activity.imageCreditUrl ? <a href={activity.imageCreditUrl} target="_blank" rel="noreferrer">{activity.imageCredit}</a> : activity.imageCredit}
-                    {activity.imageLicense ? ` · ${activity.imageLicense}` : ""}
-                  </span>
-                ) : (
-                  <span>Generated visual placeholder · Replace later with: {activity.imageSearchQuery}</span>
-                )}
-              </div>
-            )}
-            <div className="editor-grid">
-              <label className="field">
-                <span>Title</span>
-                <input value={activity.title} onChange={(event) => updateActivity(activity.id, { title: event.target.value })} />
-              </label>
-              <label className="field">
-                <span>City</span>
-                <input value={activity.city} onChange={(event) => updateActivity(activity.id, { city: event.target.value })} />
-              </label>
-              <label className="field">
-                <span>Move to day</span>
-                <select value={activity.day} onChange={(event) => updateActivity(activity.id, { day: Number(event.target.value) })}>
-                  {days.map((day) => <option key={day} value={day}>Day {day}</option>)}
-                </select>
-              </label>
-              <label className="field">
-                <span>Category</span>
-                <select value={activity.category} onChange={(event) => updateActivity(activity.id, { category: event.target.value as Category })}>
-                  {categories.map((category) => <option key={category} value={category}>{category}</option>)}
-                </select>
-              </label>
-              <label className="field">
-                <span>Low JPY</span>
-                <input type="number" value={activity.estimatedCostLow} onChange={(event) => updateActivity(activity.id, { estimatedCostLow: Number(event.target.value) })} />
-              </label>
-              <label className="field">
-                <span>Mid JPY</span>
-                <input type="number" value={activity.estimatedCostMid} onChange={(event) => updateActivity(activity.id, { estimatedCostMid: Number(event.target.value) })} />
-              </label>
-              <label className="field">
-                <span>High JPY</span>
-                <input type="number" value={activity.estimatedCostHigh} onChange={(event) => updateActivity(activity.id, { estimatedCostHigh: Number(event.target.value) })} />
-              </label>
-              <label className="field">
-                <span>Duration hours</span>
-                <input type="number" step="0.5" value={activity.durationHours} onChange={(event) => updateActivity(activity.id, { durationHours: Number(event.target.value) })} />
-              </label>
-              <label className="field wide">
-                <span>Notes</span>
-                <textarea value={activity.notes} placeholder="Add personal notes, booking numbers, food ideas" onChange={(event) => updateActivity(activity.id, { notes: event.target.value })} />
-              </label>
-              <label className="field wide">
-                <span>Logistics notes</span>
-                <textarea value={activity.logisticsNotes} onChange={(event) => updateActivity(activity.id, { logisticsNotes: event.target.value })} />
-              </label>
-            </div>
+            <label className="field"><span>Notes</span><textarea value={activity.notes} onChange={(event) => updateActivity(activity.id, { notes: event.target.value })} placeholder="No notes yet" /></label>
             <div className="expanded-actions">
-              <button type="button" className="danger-button" onClick={() => deleteActivity(activity.id)}>
-                <Trash2 size={16} aria-hidden="true" /> Delete
-              </button>
+              <label className="toggle"><input type="checkbox" checked={activity.isBooked} onChange={(event) => updateActivity(activity.id, { isBooked: event.target.checked })} /> Booked</label>
+              <label className="toggle"><input type="checkbox" checked={activity.isCompleted} onChange={(event) => updateActivity(activity.id, { isCompleted: event.target.checked })} /> Completed</label>
+              <button className="danger-button" type="button" onClick={() => deleteActivity(activity.id)}><Trash2 size={16} /> Delete</button>
             </div>
+            <div className="detail-list">
+              <p><strong>Maps:</strong> {activity.googleMapsQuery}</p>
+              {activity.address && <p><strong>Address:</strong> {activity.address}</p>}
+              <p><strong>Booking:</strong> {activity.bookingReference || "No booking reference yet."}</p>
+              <p><strong>Attachments:</strong> {activity.attachmentIds.length ? activity.attachmentIds.join(", ") : "No attachments linked."}</p>
+              {activity.imageAlt && <p><strong>Image:</strong> {activity.imageAlt}</p>}
+            </div>
+            {trip.id === "japan-2026" && japanCategories.includes(activity.category as Category) && (
+              <p className="quiet-note">Japan activity keeps original planner fields where possible, with JPY as source and CAD as comparison.</p>
+            )}
           </div>
         )}
       </div>
@@ -1048,265 +1070,279 @@ function ActivityCard({ activity, cadToJpy, updateActivity, deleteActivity, expa
   );
 }
 
-function InfoTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="info-tile">
-      {icon}
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function PlaceBrowser(props: Omit<ActivityCardProps, "activity" | "expanded" | "setExpanded"> & {
-  activities: Activity[];
+interface ActivityListProps {
+  activities: TripActivity[];
   expandedId: string | null;
   setExpandedId: (id: string | null) => void;
+  updateActivity: (id: string, patch: Partial<TripActivity>) => void;
+  deleteActivity: (id: string) => void;
   brokenImageIds: Set<string>;
-  markImageBroken: (id: string) => void;
-}) {
-  if (!props.activities.length) return <EmptyState title="No places found" body="The current filters do not match any place cards." />;
+  setBrokenImageIds: (ids: Set<string>) => void;
+  trip: Trip;
+  cadToJpy: number;
+}
+
+function PlaceBrowser(props: ActivityListProps) {
   return (
-    <div className="place-grid">
-      {props.activities.map((activity) => (
-        <ActivityCard
-          key={activity.id}
-          activity={activity}
-          cadToJpy={props.cadToJpy}
-          updateActivity={props.updateActivity}
-          deleteActivity={props.deleteActivity}
-          expanded={props.expandedId === activity.id}
-          setExpanded={(open) => props.setExpandedId(open ? activity.id : null)}
-          brokenImageIds={props.brokenImageIds}
-          markImageBroken={props.markImageBroken}
-        />
-      ))}
-    </div>
+    <section className="content-section">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Map-list browser</p>
+          <h2>{props.activities.length} visible places</h2>
+        </div>
+        <MapIcon size={22} aria-hidden="true" />
+      </div>
+      {props.activities.length ? (
+        <div className="activity-grid browser-grid">
+          {props.activities.map((activity) => <ActivityCard key={activity.id} activity={activity} {...props} />)}
+        </div>
+      ) : (
+        <EmptyState title="No matching places" body="Clear a filter or add a custom activity for this trip." />
+      )}
+    </section>
   );
 }
 
-function BudgetDashboard({
-  activities,
-  budget,
-  cadToJpy,
-  stayAreas,
-  setStayAreas,
-  branch,
-}: {
-  activities: Activity[];
-  budget: ReturnType<typeof useAppBudget>;
-  cadToJpy: number;
-  stayAreas: typeof defaultStayAreas;
-  setStayAreas: React.Dispatch<React.SetStateAction<typeof defaultStayAreas>>;
-  branch: TripBranch;
-}) {
+function BudgetDashboard({ trip, activities, budget, updateActivity, cadToJpy }: { trip: Trip; activities: TripActivity[]; budget: ReturnType<typeof makeBudget>; updateActivity: (id: string, patch: Partial<TripActivity>) => void; cadToJpy: number }) {
   const categoryRows = Object.entries(budget.categories);
-  const cityRows = Object.entries(budget.byCity).sort((a, b) => b[1].mid - a[1].mid);
-
-  function updateStay(id: string, key: "estimatedLowPerNight" | "estimatedMidPerNight" | "estimatedHighPerNight", value: number) {
-    setStayAreas((current) => current.map((stay) => (stay.id === id ? { ...stay, [key]: value } : stay)));
-  }
-
   return (
-    <div className="view-stack">
-      <section className="budget-hero">
-        <Stat label="Low estimate" value={formatJpy(budget.total.low)} note={formatCad(budget.total.low, cadToJpy)} />
-        <Stat label="Mid estimate" value={formatJpy(budget.total.mid)} note={formatCad(budget.total.mid, cadToJpy)} />
-        <Stat label="High estimate" value={formatJpy(budget.total.high)} note={formatCad(budget.total.high, cadToJpy)} />
-      </section>
-
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Rough estimate by category</p>
-            <h2>Trip budget dashboard</h2>
-          </div>
-          <CircleDollarSign size={21} aria-hidden="true" />
+    <section className="content-section">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Rough estimates</p>
+          <h2>Budget dashboard</h2>
         </div>
-        <div className="budget-bars">
-          {categoryRows.map(([label, values]) => (
-            <div className="budget-row" key={label}>
-              <div>
-                <strong>{label}</strong>
-                <span>{formatCad(values.mid, cadToJpy)} mid</span>
-              </div>
-              <div className="bar-track">
-                <span style={{ width: `${Math.max(8, (values.mid / budget.total.mid) * 100)}%` }} />
-              </div>
-              <b>{formatJpy(values.mid)}</b>
+        <CircleDollarSign size={22} aria-hidden="true" />
+      </div>
+      <div className="budget-hero">
+        <MetricCard label="Low" value={formatMoney(budget.total.low, trip.currency, cadToJpy)} detail="Lean planning estimate" icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="Mid" value={formatMoney(budget.total.mid, trip.currency, cadToJpy)} detail="Main working estimate" icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="High" value={formatMoney(budget.total.high, trip.currency, cadToJpy)} detail="Comfort buffer estimate" icon={<CircleDollarSign size={18} />} />
+      </div>
+      <div className="budget-columns">
+        <section>
+          <h3>By category</h3>
+          {categoryRows.map(([category, range]) => (
+            <div className="budget-row" key={category}>
+              <span>{category}</span>
+              <strong>{formatMoney(range.mid, trip.currency, cadToJpy)}</strong>
             </div>
           ))}
+        </section>
+        <section>
+          <h3>By city</h3>
+          {Object.entries(budget.byCity).map(([city, range]) => (
+            <div className="budget-row" key={city}>
+              <span>{city}</span>
+              <strong>{formatMoney(range.mid, trip.currency, cadToJpy)}</strong>
+            </div>
+          ))}
+        </section>
+      </div>
+      <section className="inline-editor">
+        <h3>Quick cost edits</h3>
+        {activities.slice(0, 12).map((activity) => (
+          <label className="budget-edit-row" key={activity.id}>
+            <span>{activity.title}</span>
+            <input type="number" min="0" value={activity.estimatedCost} onChange={(event) => updateActivity(activity.id, { estimatedCost: Number(event.target.value) })} />
+            <small>{activity.currency}</small>
+          </label>
+        ))}
+      </section>
+    </section>
+  );
+}
+
+function LogisticsPanel({ trip, updateHotel, routeSuggestions }: { trip: Trip; updateHotel: (id: string, patch: Partial<TripHotel>) => void; routeSuggestions: RouteSuggestion[] }) {
+  return (
+    <section className="content-section logistics-stack">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Flights, lodging, files</p>
+          <h2>Logistics</h2>
+        </div>
+        <Plane size={22} aria-hidden="true" />
+      </div>
+      <div className="logistics-grid">
+        <section>
+          <h3>Manual flight tracker</h3>
+          {trip.flights.length ? trip.flights.map((flight) => <FlightCard key={flight.id} flight={flight} />) : <EmptyState title="No flights yet" body="Add manual flight records when booked." />}
+        </section>
+        <section>
+          <h3>Lodging</h3>
+          {trip.hotels.length ? trip.hotels.map((hotel) => (
+            <article className="logistics-card" key={hotel.id}>
+              <p className="eyebrow">{hotel.city}</p>
+              <label className="field"><span>Stay</span><input value={hotel.name} onChange={(event) => updateHotel(hotel.id, { name: event.target.value })} /></label>
+              <label className="field"><span>Rough cost</span><input type="number" value={hotel.estimatedCost} onChange={(event) => updateHotel(hotel.id, { estimatedCost: Number(event.target.value) })} /></label>
+              <p>{hotel.notes || "No hotel notes yet."}</p>
+            </article>
+          )) : <EmptyState title="No hotels yet" body="Lodging cards are ready when you add stays." />}
+        </section>
+      </div>
+      <section>
+        <h3>Attachments</h3>
+        <div className="attachment-grid">
+          {trip.attachments.map((attachment) => <AttachmentCard key={attachment.id} attachment={attachment} />)}
         </div>
       </section>
+      <SuggestionList suggestions={routeSuggestions} />
+      <div className="api-note">
+        <h3>Future routing API interface</h3>
+        <p>Route suggestions are simple heuristics for now: city grouping, crowded-day warnings, and backtracking checks. Google Maps or Mapbox can plug in later with API keys outside the client bundle.</p>
+      </div>
+    </section>
+  );
+}
 
-      <section className="split-grid">
-        <div className="card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">By city / region</p>
-              <h2>Activity spend</h2>
-            </div>
-          </div>
-          <div className="compact-list">
-            {cityRows.map(([city, values]) => (
-              <div key={city}>
-                <span>{city}</span>
-                <strong>{formatJpy(values.mid)} / {formatCad(values.mid, cadToJpy)}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
+function FlightCard({ flight }: { flight: TripFlight }) {
+  return (
+    <article className="logistics-card">
+      <p className="eyebrow">Manual status, not live</p>
+      <h3>{flight.airline} {flight.flightNumber}</h3>
+      <p>{flight.departureAirport} to {flight.arrivalAirport}</p>
+      <div className="mini-tags">
+        <span>{formatDate(flight.departureTime.slice(0, 10))}</span>
+        <span>{flight.status}</span>
+      </div>
+      <p>{flight.notes}</p>
+    </article>
+  );
+}
 
-        <div className="card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Special experiences</p>
-              <h2>Budget callouts</h2>
-            </div>
-          </div>
-          <div className="compact-list">
-            {specialExperiences.map((experience) => (
-              <div key={experience.id}>
-                <span>{experience.title}</span>
-                <strong>{moneyRange(experience.estimatedLow, experience.estimatedMid, experience.estimatedHigh, cadToJpy)}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+function AttachmentCard({ attachment }: { attachment: TripAttachment }) {
+  return (
+    <article className="attachment-card">
+      <FileText size={18} aria-hidden="true" />
+      <div>
+        <h3>{attachment.fileName}</h3>
+        <p>{attachment.note}</p>
+        <span>{attachment.type}{attachment.isSensitivePlaceholder ? " | local-only placeholder" : ""}</span>
+      </div>
+    </article>
+  );
+}
 
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Stay areas</p>
-            <h2>Edit lodging assumptions</h2>
-          </div>
-          <Hotel size={21} aria-hidden="true" />
+function MapsExport({ trip, activities, allActivities, copyRows, downloadCsv }: { trip: Trip; activities: TripActivity[]; allActivities: TripActivity[]; copyRows: (rows: ReturnType<typeof exportRows>) => Promise<void>; downloadCsv: (rows?: ReturnType<typeof exportRows>) => void }) {
+  const rows = exportRows(activities);
+  const categories = Array.from(new Set(allActivities.map((activity) => activity.category))).sort();
+  const days = Array.from(new Set(allActivities.map((activity) => activity.day))).sort((a, b) => a - b);
+  return (
+    <section className="content-section">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Google Maps ready</p>
+          <h2>{trip.title} export</h2>
         </div>
-        <div className="stay-grid">
-          {stayAreas.map((stay) => (
-            <article className="stay-card" key={stay.id}>
-              <p className="eyebrow">{stay.days}</p>
-              <h3>{stay.city}: {stay.area}</h3>
-              <p>{stay.note}</p>
-              <div className="three-inputs">
-                {([
-                  ["Low", "estimatedLowPerNight"],
-                  ["Mid", "estimatedMidPerNight"],
-                  ["High", "estimatedHighPerNight"],
-                ] as Array<[string, "estimatedLowPerNight" | "estimatedMidPerNight" | "estimatedHighPerNight"]>).map(([label, key]) => (
-                  <label className="field" key={key}>
-                    <span>{label} / night</span>
-                    <input type="number" value={stay[key]} onChange={(event) => updateStay(stay.id, key, Number(event.target.value))} />
-                  </label>
-                ))}
-              </div>
+        <MapIcon size={22} aria-hidden="true" />
+      </div>
+      <div className="maps-toolbar">
+        <button className="primary-button" type="button" onClick={() => copyRows(exportRows(allActivities))}><Clipboard size={17} /> Copy all</button>
+        <button className="ghost-button" type="button" onClick={() => downloadCsv(exportRows(allActivities))}><Download size={17} /> Download CSV</button>
+      </div>
+      <div className="export-group-grid">
+        <section>
+          <h3>By category</h3>
+          {categories.map((category) => {
+            const categoryRows = exportRows(allActivities.filter((activity) => activity.category === category));
+            return (
+              <button key={category} className="export-row-button" type="button" onClick={() => copyRows(categoryRows)}>
+                <span>{category}</span>
+                <strong>{categoryRows.length} rows</strong>
+              </button>
+            );
+          })}
+        </section>
+        <section>
+          <h3>By day</h3>
+          {days.map((day) => {
+            const dayRows = exportRows(allActivities.filter((activity) => activity.day === day));
+            return (
+              <button key={day} className="export-row-button" type="button" onClick={() => copyRows(dayRows)}>
+                <span>Day {day}</span>
+                <strong>{dayRows.length} rows</strong>
+              </button>
+            );
+          })}
+        </section>
+      </div>
+      {rows.length ? (
+        <div className="maps-list">
+          {rows.map((row) => (
+            <article className="maps-row" key={`${row.day}-${row.place}`}>
+              <strong>{row.place}</strong>
+              <span>{row.address || row.query}</span>
+              <small>Day {row.day} | {row.category} | {row.estimatedCost} {row.currency} | {row.travelTime || "travel time TBD"}</small>
             </article>
           ))}
         </div>
-      </section>
-
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Route transport</p>
-            <h2>{branch === "hokkaido" ? "Hokkaido" : "Kyushu"} active route</h2>
-          </div>
-        </div>
-        <div className="compact-list">
-          {routeMoves.filter((move) => !move.branch || move.branch === branch).map((move) => (
-            <div key={move.id}>
-              <span>{move.from} to {move.to} · Day {move.day} · {move.duration}</span>
-              <strong>{moneyRange(move.estimatedLow, move.estimatedMid, move.estimatedHigh, cadToJpy)}</strong>
-            </div>
-          ))}
-        </div>
-      </section>
-      <p className="fine-print">Activity count in this budget: {activities.length}. All numbers are rough planning estimates and should be edited as bookings become real.</p>
-    </div>
+      ) : (
+        <EmptyState title="No export rows" body="Adjust filters or switch trips to generate map rows." />
+      )}
+    </section>
   );
 }
 
-function MapsExport({
-  activities,
-  allActivities,
-  cadToJpy,
-  copyText,
-  downloadCsv,
-}: {
-  activities: Activity[];
-  allActivities: Activity[];
-  cadToJpy: number;
-  copyText: (text: string) => Promise<void>;
-  downloadCsv: (exportActivities?: Activity[]) => void;
-}) {
-  const rows = makeExportRows(activities);
-  const allRows = makeExportRows(allActivities);
-  const grouped = categories.map((category) => ({
-    category,
-    rows: rows.filter((row) => row.category === category),
-  }));
-
-  if (!activities.length) return <EmptyState title="No export rows" body="Clear filters to export the full Google Maps list." />;
-
+function AssistantPanel({ trip, activities, routeSuggestions }: { trip: Trip; activities: TripActivity[]; routeSuggestions: RouteSuggestion[] }) {
+  const rainy = activities.filter((activity) => /rain|weather|boat|mountain|outdoor|hike/i.test(`${activity.description} ${activity.notes} ${activity.title}`)).slice(0, 5);
+  const cheaper = activities.filter((activity) => activity.estimatedCost > (trip.currency === "JPY" ? 12000 : 100)).slice(0, 5);
   return (
-    <div className="view-stack">
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Google Maps ready</p>
-            <h2>Copy lists or export CSV</h2>
-          </div>
-          <div className="button-row">
-            <button className="ghost-button" type="button" onClick={() => copyText(rowsToCsv(allRows))}>
-              <Clipboard size={17} aria-hidden="true" /> Export all
-            </button>
-            <button className="primary-button" type="button" onClick={() => downloadCsv(allActivities)}>
-              <Download size={17} aria-hidden="true" /> CSV
-            </button>
-          </div>
+    <section className="content-section assistant-panel">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Local suggestions only</p>
+          <h2>AI Assistant placeholder</h2>
         </div>
-        <p className="fine-print">Rows include place name, city, Google Maps search query, category, priority, note, duration, and rough JPY budget with CAD shown on cards.</p>
-      </section>
-
-      {grouped.map(({ category, rows: categoryRows }) => (
-        <section className="card export-section" key={category}>
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">{categoryRows.length} places</p>
-              <h2>{category}</h2>
-            </div>
-            <button className="ghost-button" type="button" onClick={() => copyText(rowsToCsv(categoryRows))} disabled={!categoryRows.length}>
-              <Clipboard size={17} aria-hidden="true" /> Copy
-            </button>
-          </div>
-          {categoryRows.length ? (
-            <div className="export-list">
-              {categoryRows.map((row) => (
-                <article key={`${row.place}-${row.city}`}>
-                  <strong>{row.place}</strong>
-                  <span>{row.city} · Priority {row.priority} · {row.duration}</span>
-                  <p>{row.note}</p>
-                  <small>{row.query} · {row.budget} · {formatCad(Number(row.budget.split("-")[1].replace(" JPY", "")), cadToJpy)} high</small>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="Nothing in this category" body="Move an activity into this category or clear the active filters." compact />
-          )}
+        <Bot size={22} aria-hidden="true" />
+      </div>
+      <p>This panel is wired for future prompts, but it does not call paid AI APIs yet. The suggestions below are local rules based on the current itinerary.</p>
+      <div className="prompt-grid">
+        {["make this day lighter", "optimize this route", "find cheaper alternatives", "add more food stops", "turn this into a Google Maps list", "what should I skip if it rains?"].map((prompt) => (
+          <button key={prompt} type="button" className="ghost-button">{prompt}</button>
+        ))}
+      </div>
+      <div className="assistant-grid">
+        <section>
+          <h3>Make it lighter</h3>
+          <SuggestionList suggestions={routeSuggestions.filter((item) => item.severity === "warning")} />
         </section>
+        <section>
+          <h3>Rain swaps</h3>
+          {rainy.length ? rainy.map((activity) => <p key={activity.id}><strong>{activity.title}:</strong> keep a nearby indoor or low-weather backup in notes.</p>) : <EmptyState title="No obvious rain-sensitive stops" body="Add weather notes to surface more swaps." />}
+        </section>
+        <section>
+          <h3>Cheaper alternatives</h3>
+          {cheaper.length ? cheaper.map((activity) => <p key={activity.id}><strong>{activity.title}:</strong> mark this optional or compare a lower-cost day plan.</p>) : <EmptyState title="No high-cost flags" body="Budget edits will update this list." />}
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function SuggestionList({ suggestions }: { suggestions: RouteSuggestion[] }) {
+  if (!suggestions.length) return <EmptyState title="No route warnings" body="The current filters look manageable." />;
+  return (
+    <div className="suggestion-list">
+      {suggestions.map((suggestion) => (
+        <article className={`suggestion-card ${suggestion.severity}`} key={suggestion.id}>
+          {suggestion.severity === "warning" ? <TriangleAlert size={18} /> : <CloudRain size={18} />}
+          <div>
+            <h3>{suggestion.title}</h3>
+            <p>{suggestion.detail}</p>
+          </div>
+        </article>
       ))}
     </div>
   );
 }
 
-function EmptyState({ title, body, compact = false }: { title: string; body: string; compact?: boolean }) {
+function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <section className={compact ? "empty-state compact" : "empty-state"}>
-      <MapPin size={compact ? 20 : 28} aria-hidden="true" />
-      <h2>{title}</h2>
+    <div className="empty-state">
+      <Sparkles size={20} aria-hidden="true" />
+      <h3>{title}</h3>
       <p>{body}</p>
-    </section>
+    </div>
   );
 }
 
