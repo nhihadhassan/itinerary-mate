@@ -24,6 +24,7 @@ import {
   FileText,
   GripVertical,
   Hotel,
+  Import,
   Map as MapIcon,
   MapPin,
   Moon,
@@ -53,7 +54,7 @@ import {
 import { peruRouteSuggestions, peruTrip } from "./peruItinerary";
 import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
 
-type AppView = "dashboard" | "itinerary" | "places" | "budget" | "logistics" | "maps" | "assistant";
+type AppView = "dashboard" | "itinerary" | "places" | "budget" | "logistics" | "maps" | "assistant" | "import";
 type ThemePreference = "system" | "light" | "dark";
 
 interface LegacyJapanState {
@@ -92,6 +93,7 @@ const navItems: Array<{ id: AppView; label: string }> = [
   { id: "logistics", label: "Logistics" },
   { id: "maps", label: "Maps" },
   { id: "assistant", label: "AI" },
+  { id: "import", label: "Import" },
 ];
 
 const categoryOptions: TripCategory[] = [
@@ -144,6 +146,7 @@ function japanActivityToTripActivity(activity: Activity): TripActivity {
     city: activity.city,
     country: "Japan",
     title: activity.title,
+    type: "activity",
     description: activity.description,
     category: activity.category,
     address: "",
@@ -156,6 +159,12 @@ function japanActivityToTripActivity(activity: Activity): TripActivity {
     estimatedCostMid: activity.estimatedCostMid,
     estimatedCostHigh: activity.estimatedCostHigh,
     currency: "JPY",
+    costLocal: activity.estimatedCostMid,
+    localCurrencyCode: "JPY",
+    costCad: Math.round(activity.estimatedCostMid / DEFAULT_CAD_TO_JPY),
+    costCategory: "activity",
+    costStatus: "imported",
+    bookingStatus: activity.isBooked ? "booked" : activity.bookingRequired === "yes" ? "needs-confirmation" : "optional",
     attachmentIds: [],
     notes: activity.notes,
     imageUrl: activity.imageUrl || placeholderFor(activity.title),
@@ -180,6 +189,11 @@ function japanStayToHotel(stay: StayArea): TripHotel {
     checkOut: stay.days,
     estimatedCost: stay.estimatedMidPerNight * nights,
     currency: "JPY",
+    costLocal: stay.estimatedMidPerNight * nights,
+    localCurrencyCode: "JPY",
+    costCad: Math.round((stay.estimatedMidPerNight * nights) / DEFAULT_CAD_TO_JPY),
+    costStatus: "imported",
+    source: "japan-default",
     notes: `${nights} nights. ${stay.note}`,
   };
 }
@@ -192,6 +206,13 @@ function buildJapanTrip(activities = defaultActivities, stayAreas = defaultStayA
     startDate: "2026-09-01",
     endDate: "2026-09-30",
     currency: "JPY",
+    currencyConfig: {
+      localCurrency: "JPY",
+      comparisonCurrency: "CAD",
+      localPerCad: DEFAULT_CAD_TO_JPY,
+      label: "JPY per 1 CAD",
+      isEstimate: true,
+    },
     description: "A month in Japan built around Tokyo, Fuji, Kyoto, Osaka, Hiroshima, the Alps, and one northern or southern extension.",
     activities: hydrateJapanActivities(activities).map(japanActivityToTripActivity),
     flights: [
@@ -225,19 +246,45 @@ function buildJapanTrip(activities = defaultActivities, stayAreas = defaultStayA
 
 function mergeTrip(defaultTrip: Trip, storedTrip?: Trip): Trip {
   if (!storedTrip) return defaultTrip;
-  const defaults = new Map(defaultTrip.activities.map((activity) => [activity.id, activity]));
-  const activities = storedTrip.activities.map((activity) => ({
-    ...defaults.get(activity.id),
-    ...activity,
-    attachmentIds: activity.attachmentIds ?? [],
-    imageUrl: activity.imageUrl || defaults.get(activity.id)?.imageUrl || placeholderFor(activity.title),
-    currency: activity.currency || defaultTrip.currency,
-  }));
-  const missingDefaults = defaultTrip.activities.filter((activity) => !activities.some((item) => item.id === activity.id));
+  const storedById = new Map(storedTrip.activities.map((activity) => [activity.id, activity]));
+  const storedBySource = new Map(storedTrip.activities.filter((activity) => activity.sourceId).map((activity) => [activity.sourceId, activity]));
+  const storedByTitleDate = new Map(storedTrip.activities.map((activity) => [`${activity.title.toLowerCase()}|${activity.date || ""}`, activity]));
+  const defaultIds = new Set(defaultTrip.activities.map((activity) => activity.id));
+  const editableMerge = (base: TripActivity, stored?: TripActivity): TripActivity => {
+    if (!stored) return base;
+    const sameCurrency = stored.currency === base.currency;
+    return {
+      ...base,
+      notes: stored.notes || base.notes,
+      isBooked: stored.isBooked ?? base.isBooked,
+      isCompleted: stored.isCompleted ?? base.isCompleted,
+      bookingReference: stored.bookingReference || base.bookingReference,
+      confirmationReference: stored.confirmationReference || base.confirmationReference,
+      bookingStatus: stored.bookingStatus || base.bookingStatus,
+      day: stored.day || base.day,
+      category: stored.category || base.category,
+      estimatedCost: sameCurrency ? stored.estimatedCost : base.estimatedCost,
+      costLocal: sameCurrency ? stored.costLocal ?? stored.estimatedCost : base.costLocal,
+      costCad: sameCurrency ? stored.costCad ?? base.costCad : base.costCad,
+      costStatus: sameCurrency ? stored.costStatus || base.costStatus : base.costStatus,
+      imageUrl: stored.imageUrl || base.imageUrl || placeholderFor(base.title),
+      attachmentIds: stored.attachmentIds?.length ? stored.attachmentIds : base.attachmentIds ?? [],
+    };
+  };
+  const activities = defaultTrip.activities.map((activity) =>
+    editableMerge(
+      activity,
+      storedById.get(activity.id) ||
+        (activity.sourceId ? storedBySource.get(activity.sourceId) : undefined) ||
+        storedByTitleDate.get(`${activity.title.toLowerCase()}|${activity.date || ""}`),
+    ),
+  );
+  const manualActivities = storedTrip.activities.filter((activity) => !defaultIds.has(activity.id) && (activity.source === "manual" || activity.id.includes("custom") || activity.id.includes("rest")));
   return {
     ...defaultTrip,
-    ...storedTrip,
-    activities: [...activities, ...missingDefaults],
+    notes: storedTrip.notes || defaultTrip.notes,
+    currencyConfig: storedTrip.currencyConfig || defaultTrip.currencyConfig,
+    activities: [...activities, ...manualActivities],
     flights: storedTrip.flights?.length ? storedTrip.flights : defaultTrip.flights,
     hotels: storedTrip.hotels?.length ? storedTrip.hotels : defaultTrip.hotels,
     attachments: storedTrip.attachments?.length ? storedTrip.attachments : defaultTrip.attachments,
@@ -284,25 +331,40 @@ function formatDate(date?: string) {
   return new Intl.DateTimeFormat("en-CA", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${date}T12:00:00`));
 }
 
-function formatMoney(value: number, currency: string, cadToJpy = DEFAULT_CAD_TO_JPY) {
+function formatMoney(value: number, currency: string, localPerCad = DEFAULT_CAD_TO_JPY) {
   if (currency === "JPY") {
     const jpy = new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(Math.round(value));
-    const cad = `CAD ${new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Math.round(value / cadToJpy))}`;
+    const cad = `CAD ${new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Math.round(value / localPerCad))}`;
     return `${jpy} (${cad})`;
   }
-  if (currency === "CAD") {
-    const cad = `CAD ${new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Math.round(value))}`;
-    const jpy = new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(Math.round(value * cadToJpy));
-    return `${cad} (${jpy})`;
+  if (currency === "PEN") {
+    const pen = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN", maximumFractionDigits: 0 }).format(Math.round(value));
+    const cad = `CAD ${new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Math.round(value / localPerCad))}`;
+    return `${pen} (${cad})`;
   }
   return new Intl.NumberFormat("en-CA", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
 }
 
+function getExchangeRate(trip: Trip, japanCadToJpy: number) {
+  return trip.currencyConfig?.localPerCad || (trip.currency === "JPY" ? japanCadToJpy : 1);
+}
+
+function getCurrencyLabel(trip: Trip) {
+  return trip.currencyConfig?.label || `${trip.currency} per 1 CAD`;
+}
+
+function getCostLabel(activity: TripActivity, exchangeRate: number) {
+  const cost = activity.costLocal ?? activity.estimatedCost;
+  if (!cost && activity.costStatus === "needs-confirmation") return "Cost needs confirmation";
+  return `${formatMoney(cost, activity.localCurrencyCode || activity.currency, exchangeRate)}${activity.costCategory ? ` | ${activity.costCategory}` : ""}`;
+}
+
 function activityRange(activity: TripActivity): BudgetRange {
+  const cost = activity.costLocal ?? activity.estimatedCost;
   return {
-    low: activity.estimatedCostLow ?? activity.estimatedCost,
-    mid: activity.estimatedCostMid ?? activity.estimatedCost,
-    high: activity.estimatedCostHigh ?? activity.estimatedCost,
+    low: activity.estimatedCostLow ?? cost,
+    mid: activity.estimatedCostMid ?? cost,
+    high: activity.estimatedCostHigh ?? cost,
   };
 }
 
@@ -330,16 +392,19 @@ function exportRows(activities: TripActivity[]) {
       day: activity.day,
       date: activity.date || "",
       notes: [activity.description, activity.notes].filter(Boolean).join(" "),
-      estimatedCost: activity.estimatedCost,
-      currency: activity.currency,
+      estimatedCost: activity.costLocal ?? activity.estimatedCost,
+      currency: activity.localCurrencyCode || activity.currency,
+      cadCost: activity.costCad ?? 0,
+      costStatus: activity.costStatus || "",
+      source: activity.source || "",
       travelTime: activity.travelTimeFromPrevious || "",
       query: activity.googleMapsQuery,
     }));
 }
 
 function rowsToCsv(rows: ReturnType<typeof exportRows>) {
-  const header = ["Place name", "Address or search query", "City", "Category", "Day", "Date", "Notes", "Estimated cost", "Currency", "Travel time"];
-  const body = rows.map((row) => [row.place, row.address || row.query, row.city, row.category, row.day, row.date, row.notes, row.estimatedCost, row.currency, row.travelTime]);
+  const header = ["Place name", "Address or search query", "City", "Category", "Day", "Date", "Notes", "Estimated local cost", "Local currency", "CAD estimate", "Cost status", "Travel time", "Source"];
+  const body = rows.map((row) => [row.place, row.address || row.query, row.city, row.category, row.day, row.date, row.notes, row.estimatedCost, row.currency, row.cadCost, row.costStatus, row.travelTime, row.source]);
   return [header, ...body].map((row) => row.map(csvEscape).join(",")).join("\n");
 }
 
@@ -407,6 +472,7 @@ function App() {
   const budget = useMemo(() => makeBudget(activeTrip, allVisibleActivities), [activeTrip, allVisibleActivities]);
   const routeSuggestions = useMemo(() => makeRouteSuggestions(activeTrip, allVisibleActivities), [activeTrip, allVisibleActivities]);
   const resolvedTheme = state.themePreference === "system" ? (systemDark ? "dark" : "light") : state.themePreference;
+  const activeExchangeRate = getExchangeRate(activeTrip, state.japanCadToJpy);
 
   useEffect(() => {
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");
@@ -448,14 +514,71 @@ function App() {
     }));
   }
 
+  function setActiveExchangeRate(localPerCad: number) {
+    if (activeTrip.id === "japan-2026") {
+      updateState({ japanCadToJpy: localPerCad });
+    }
+    updateActiveTrip({
+      currencyConfig: {
+        localCurrency: activeTrip.currency,
+        comparisonCurrency: "CAD",
+        localPerCad,
+        label: `${activeTrip.currency} per 1 CAD`,
+        isEstimate: true,
+      },
+    });
+  }
+
+  function replaceActiveTrip(nextTrip: Trip) {
+    setState((current) => ({
+      ...current,
+      trips: {
+        ...current.trips,
+        [current.activeTripId]: nextTrip,
+      },
+    }));
+  }
+
   function updateActivity(id: string, patch: Partial<TripActivity>) {
     updateActiveTrip({
-      activities: activeTrip.activities.map((activity) => (activity.id === id ? { ...activity, ...patch } : activity)),
+      activities: activeTrip.activities.map((activity) => {
+        if (activity.id !== id) return activity;
+        const nextPatch: Partial<TripActivity> = { ...patch };
+        if (patch.estimatedCost !== undefined || patch.costLocal !== undefined) {
+          const nextCost = Number(patch.costLocal ?? patch.estimatedCost ?? 0);
+          nextPatch.estimatedCost = nextCost;
+          nextPatch.costLocal = nextCost;
+          nextPatch.localCurrencyCode = activity.localCurrencyCode || activeTrip.currency;
+          nextPatch.costCad = Number((nextCost / activeExchangeRate).toFixed(2));
+          nextPatch.costStatus = "manual";
+          if (activity.estimatedCostLow !== undefined) nextPatch.estimatedCostLow = nextCost;
+          if (activity.estimatedCostMid !== undefined) nextPatch.estimatedCostMid = nextCost;
+          if (activity.estimatedCostHigh !== undefined) nextPatch.estimatedCostHigh = nextCost;
+        }
+        if (patch.isBooked !== undefined) {
+          nextPatch.bookingStatus = patch.isBooked ? "booked" : "not-booked";
+        }
+        return { ...activity, ...nextPatch };
+      }),
     });
   }
 
   function updateHotel(id: string, patch: Partial<TripHotel>) {
-    updateActiveTrip({ hotels: activeTrip.hotels.map((hotel) => (hotel.id === id ? { ...hotel, ...patch } : hotel)) });
+    updateActiveTrip({
+      hotels: activeTrip.hotels.map((hotel) => {
+        if (hotel.id !== id) return hotel;
+        const nextPatch: Partial<TripHotel> = { ...patch };
+        if (patch.estimatedCost !== undefined || patch.costLocal !== undefined) {
+          const nextCost = Number(patch.costLocal ?? patch.estimatedCost ?? 0);
+          nextPatch.estimatedCost = nextCost;
+          nextPatch.costLocal = nextCost;
+          nextPatch.localCurrencyCode = hotel.localCurrencyCode || activeTrip.currency;
+          nextPatch.costCad = Number((nextCost / activeExchangeRate).toFixed(2));
+          nextPatch.costStatus = "manual";
+        }
+        return { ...hotel, ...nextPatch };
+      }),
+    });
   }
 
   function addActivity() {
@@ -468,6 +591,7 @@ function App() {
       city: selectedCity === "All" ? activeTrip.country : selectedCity,
       country: activeTrip.country,
       title: "New custom activity",
+      type: "activity",
       description: "Add why this belongs on the trip.",
       category: "Nice To Have",
       address: "",
@@ -480,6 +604,12 @@ function App() {
       estimatedCostMid: activeTrip.currency === "JPY" ? 0 : undefined,
       estimatedCostHigh: activeTrip.currency === "JPY" ? 0 : undefined,
       currency: activeTrip.currency,
+      costLocal: 0,
+      localCurrencyCode: activeTrip.currency,
+      costCad: 0,
+      costCategory: "activity",
+      costStatus: "manual",
+      bookingStatus: "not-booked",
       attachmentIds: [],
       notes: "",
       imageUrl: placeholderFor("Custom activity"),
@@ -514,12 +644,19 @@ function App() {
           city: selectedCity === "All" ? activeTrip.country : selectedCity,
           country: activeTrip.country,
           title: "Rest day block",
+          type: "note",
           description: "Keep this space protected. Laundry, sleep, slow food, and no big transfers.",
           category: "Note",
           googleMapsQuery: `${activeTrip.country} rest day`,
           duration: "Flexible",
           estimatedCost: 0,
           currency: activeTrip.currency,
+          costLocal: 0,
+          localCurrencyCode: activeTrip.currency,
+          costCad: 0,
+          costCategory: "misc",
+          costStatus: "manual",
+          bookingStatus: "not-booked",
           attachmentIds: [],
           notes: "",
           imageUrl: placeholderFor("Rest day"),
@@ -612,12 +749,12 @@ function App() {
 
           <section className="card quick-card">
             <p className="eyebrow">Rough total</p>
-            <strong>{formatMoney(budget.total.mid, activeTrip.currency, state.japanCadToJpy)}</strong>
-            <span>Low {formatMoney(budget.total.low, activeTrip.currency, state.japanCadToJpy)}. High {formatMoney(budget.total.high, activeTrip.currency, state.japanCadToJpy)}.</span>
+            <strong>{formatMoney(budget.total.mid, activeTrip.currency, activeExchangeRate)}</strong>
+            <span>Low {formatMoney(budget.total.low, activeTrip.currency, activeExchangeRate)}. High {formatMoney(budget.total.high, activeTrip.currency, activeExchangeRate)}.</span>
             <label className="field compact-field">
               <span>Planning rate</span>
-              <input type="number" min="1" value={state.japanCadToJpy} onChange={(event) => updateState({ japanCadToJpy: Math.max(1, Number(event.target.value)) })} />
-              <small>JPY per 1 CAD, rough planning only</small>
+              <input type="number" min="0.01" step="0.01" value={activeExchangeRate} onChange={(event) => setActiveExchangeRate(Math.max(0.01, Number(event.target.value)))} />
+              <small>{getCurrencyLabel(activeTrip)}, rough planning only</small>
             </label>
           </section>
 
@@ -649,7 +786,7 @@ function App() {
               trip={activeTrip}
               activities={allVisibleActivities}
               budget={budget}
-              cadToJpy={state.japanCadToJpy}
+              exchangeRate={activeExchangeRate}
               routeSuggestions={routeSuggestions}
             />
           )}
@@ -666,7 +803,7 @@ function App() {
                 brokenImageIds={brokenImageIds}
                 setBrokenImageIds={setBrokenImageIds}
                 trip={activeTrip}
-                cadToJpy={state.japanCadToJpy}
+                exchangeRate={activeExchangeRate}
               />
             </DndContext>
           )}
@@ -681,16 +818,16 @@ function App() {
               brokenImageIds={brokenImageIds}
               setBrokenImageIds={setBrokenImageIds}
               trip={activeTrip}
-              cadToJpy={state.japanCadToJpy}
+              exchangeRate={activeExchangeRate}
             />
           )}
 
           {activeView === "budget" && (
-            <BudgetDashboard trip={activeTrip} activities={allVisibleActivities} budget={budget} updateActivity={updateActivity} cadToJpy={state.japanCadToJpy} />
+            <BudgetDashboard trip={activeTrip} activities={allVisibleActivities} budget={budget} updateActivity={updateActivity} exchangeRate={activeExchangeRate} />
           )}
 
           {activeView === "logistics" && (
-            <LogisticsPanel trip={activeTrip} updateHotel={updateHotel} routeSuggestions={routeSuggestions} />
+            <LogisticsPanel trip={activeTrip} updateHotel={updateHotel} routeSuggestions={routeSuggestions} exchangeRate={activeExchangeRate} />
           )}
 
           {activeView === "maps" && (
@@ -699,15 +836,20 @@ function App() {
               activities={filteredActivities}
               allActivities={allVisibleActivities}
               copyRows={async (rows) => {
-                await copyText(rows.map((row) => `${row.place} | ${row.address || row.query} | Day ${row.day} | ${row.category} | ${row.notes}`).join("\n"));
+                await copyText(rows.map((row) => `${row.place} | ${row.address || row.query} | Day ${row.day} | ${row.category} | ${row.estimatedCost} ${row.currency} | CAD ${row.cadCost || "estimate"} | ${row.notes}`).join("\n"));
                 setSaveStatus("Copied Google Maps rows");
               }}
               downloadCsv={downloadCsv}
+              exchangeRate={activeExchangeRate}
             />
           )}
 
           {activeView === "assistant" && (
             <AssistantPanel trip={activeTrip} activities={allVisibleActivities} routeSuggestions={routeSuggestions} />
+          )}
+
+          {activeView === "import" && (
+            <ImportPanel trip={activeTrip} replaceActiveTrip={replaceActiveTrip} />
           )}
         </div>
       </main>
@@ -862,7 +1004,7 @@ function FilterBar(props: {
   );
 }
 
-function Dashboard({ trip, activities, budget, cadToJpy, routeSuggestions }: { trip: Trip; activities: TripActivity[]; budget: ReturnType<typeof makeBudget>; cadToJpy: number; routeSuggestions: RouteSuggestion[] }) {
+function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }: { trip: Trip; activities: TripActivity[]; budget: ReturnType<typeof makeBudget>; exchangeRate: number; routeSuggestions: RouteSuggestion[] }) {
   const booked = activities.filter((activity) => activity.isBooked).length + trip.flights.filter((flight) => flight.status === "booked" || flight.status === "manual / not live yet").length;
   const incomplete = activities.filter((activity) => !activity.isCompleted).length;
   const nextFlight = trip.flights.find((flight) => new Date(flight.departureTime).getTime() >= Date.now()) || trip.flights[0];
@@ -879,7 +1021,7 @@ function Dashboard({ trip, activities, budget, cadToJpy, routeSuggestions }: { t
       </div>
       <div className="dashboard-grid">
         <MetricCard label="Days" value={String(totalDays)} detail={`${formatDate(trip.startDate)} to ${formatDate(trip.endDate)}`} icon={<CalendarDays size={18} />} />
-        <MetricCard label="Rough estimate" value={formatMoney(budget.total.mid, trip.currency, cadToJpy)} detail="Editable, local-first budget" icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="Rough estimate" value={formatMoney(budget.total.mid, trip.currency, exchangeRate)} detail="Editable, local-first budget" icon={<CircleDollarSign size={18} />} />
         <MetricCard label="Booked items" value={String(booked)} detail="Includes manual flight records" icon={<BadgeCheck size={18} />} />
         <MetricCard label="Incomplete" value={String(incomplete)} detail="Activities still open" icon={<CheckCircle2 size={18} />} />
         <MetricCard label="Next flight" value={nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : "Add flight"} detail={nextFlight ? `${nextFlight.departureAirport} to ${nextFlight.arrivalAirport}` : "Manual tracker ready"} icon={<Plane size={18} />} />
@@ -944,34 +1086,46 @@ function ItineraryTimeline(props: {
   brokenImageIds: Set<string>;
   setBrokenImageIds: (ids: Set<string>) => void;
   trip: Trip;
-  cadToJpy: number;
+  exchangeRate: number;
 }) {
   return (
-    <section className="timeline content-section">
+    <section className={`timeline content-section ${props.trip.id === "peru-2026" ? "wanderlog-timeline" : ""}`}>
       {props.days.map((day) => {
         const dayActivities = props.activities.filter((activity) => activity.day === day);
         const pacing = dayScore(dayActivities);
+        const routeSummary = dayActivities.map((activity) => activity.city).filter(Boolean).filter((city, index, list) => list.indexOf(city) === index).join(" -> ");
         return (
           <DayDropZone key={day} day={day}>
-            <div className="day-header">
+            <details className="day-details" open>
+            <summary className="day-header day-summary">
               <div>
                 <p className="eyebrow">Day {day}</p>
                 <h2>{dayActivities[0]?.city || "Open day"}</h2>
+                {props.trip.id === "peru-2026" && dayActivities.length > 0 && <span className="route-summary">{routeSummary || "Route needs confirmation"}</span>}
               </div>
               <div className="day-meta">
                 <span className={`pacing-pill ${pacing.tone}`}>{pacing.label}</span>
-                <span>{formatMoney(sumRanges(dayActivities.map(activityRange)).mid, props.trip.currency, props.cadToJpy)}</span>
+                <span>{formatMoney(sumRanges(dayActivities.map(activityRange)).mid, props.trip.currency, props.exchangeRate)}</span>
               </div>
-            </div>
+            </summary>
             {dayActivities.length ? (
               <div className="activity-grid">
-                {dayActivities.map((activity) => (
-                  <ActivityCard key={activity.id} activity={activity} {...props} />
+                {dayActivities.map((activity, index) => (
+                  <div className="timeline-item" key={activity.id}>
+                    {props.trip.id === "peru-2026" && index > 0 && (
+                      <div className={activity.isRouteEstimate ? "route-connector estimate" : "route-connector"}>
+                        <span>{activity.routeLegEstimate || activity.travelTimeFromPrevious || "Travel time missing"}</span>
+                        {activity.isRouteEstimate && <em>estimate</em>}
+                      </div>
+                    )}
+                    <ActivityCard activity={activity} {...props} />
+                  </div>
                 ))}
               </div>
             ) : (
               <EmptyState title="No plans on this day" body="Add a rest block or move a lower-priority activity here." />
             )}
+            </details>
           </DayDropZone>
         );
       })}
@@ -993,7 +1147,7 @@ function ActivityCard({
   brokenImageIds,
   setBrokenImageIds,
   trip,
-  cadToJpy,
+  exchangeRate,
 }: {
   activity: TripActivity;
   expandedId: string | null;
@@ -1003,14 +1157,15 @@ function ActivityCard({
   brokenImageIds: Set<string>;
   setBrokenImageIds: (ids: Set<string>) => void;
   trip: Trip;
-  cadToJpy: number;
+  exchangeRate: number;
 }) {
   const expanded = expandedId === activity.id;
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: activity.id });
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
   const hasImage = activity.imageUrl && !activity.imageUrl.startsWith("linear-gradient") && !brokenImageIds.has(activity.id);
+  const needsConfirmation = Boolean(activity.needsConfirmationReasons?.length || activity.costStatus === "needs-confirmation" || activity.bookingStatus === "needs-confirmation");
   return (
-    <article className={activity.isCompleted ? "place-card completed" : "place-card"} ref={setNodeRef} style={style}>
+    <article className={`place-card type-${activity.type || "activity"}${activity.isCompleted ? " completed" : ""}`} ref={setNodeRef} style={style}>
       <div className="card-image" style={{ background: hasImage ? undefined : activity.imageUrl || placeholderFor(activity.title) }}>
         {hasImage && <img src={activity.imageUrl} alt={activity.imageAlt || activity.title} loading="lazy" onError={() => setBrokenImageIds(new Set([...brokenImageIds, activity.id]))} />}
         <button className="drag-handle" type="button" {...listeners} {...attributes} aria-label={`Drag ${activity.title}`}>
@@ -1029,11 +1184,14 @@ function ActivityCard({
           </button>
         </div>
         <p>{activity.description}</p>
+        {activity.address && <p className="address-line"><MapPin size={14} aria-hidden="true" /> {activity.address}</p>}
         <div className="meta-chips">
-          <span><CircleDollarSign size={14} /> {formatMoney(activity.estimatedCost, activity.currency, cadToJpy)}</span>
+          <span><CircleDollarSign size={14} /> {getCostLabel(activity, exchangeRate)}</span>
           <span><MapPin size={14} /> {activity.travelTimeFromPrevious || "Add travel time"}</span>
-          <span><BadgeCheck size={14} /> {activity.isBooked ? "Booked" : "Not booked"}</span>
+          <span><BadgeCheck size={14} /> {activity.isBooked || activity.bookingStatus === "booked" ? "Booked" : "Not booked"}</span>
           <span><Sparkles size={14} /> Priority {activity.priority}</span>
+          {needsConfirmation && <span className="needs-confirmation"><TriangleAlert size={14} /> Needs confirmation</span>}
+          {activity.source && <span>{activity.source}</span>}
         </div>
         {expanded && (
           <div className="expanded-panel">
@@ -1042,7 +1200,7 @@ function ActivityCard({
               <label className="field"><span>City</span><input value={activity.city} onChange={(event) => updateActivity(activity.id, { city: event.target.value })} /></label>
               <label className="field"><span>Day</span><input type="number" min="1" value={activity.day} onChange={(event) => updateActivity(activity.id, { day: Math.max(1, Number(event.target.value)) })} /></label>
               <label className="field"><span>Category</span><select value={activity.category} onChange={(event) => updateActivity(activity.id, { category: event.target.value as TripCategory })}>{categoryOptions.map((category) => <option key={category}>{category}</option>)}</select></label>
-              <label className="field"><span>Cost</span><input type="number" min="0" value={activity.estimatedCost} onChange={(event) => updateActivity(activity.id, { estimatedCost: Number(event.target.value) })} /></label>
+              <label className="field"><span>Cost ({activity.localCurrencyCode || activity.currency})</span><input type="number" min="0" value={activity.costLocal ?? activity.estimatedCost} onChange={(event) => updateActivity(activity.id, { estimatedCost: Number(event.target.value) })} /></label>
               <label className="field"><span>Duration</span><input value={activity.duration} onChange={(event) => updateActivity(activity.id, { duration: event.target.value })} /></label>
               <label className="field"><span>Travel time</span><input value={activity.travelTimeFromPrevious || ""} onChange={(event) => updateActivity(activity.id, { travelTimeFromPrevious: event.target.value })} /></label>
               <label className="field"><span>Image URL</span><input value={activity.imageUrl} onChange={(event) => updateActivity(activity.id, { imageUrl: event.target.value })} /></label>
@@ -1056,7 +1214,11 @@ function ActivityCard({
             <div className="detail-list">
               <p><strong>Maps:</strong> {activity.googleMapsQuery}</p>
               {activity.address && <p><strong>Address:</strong> {activity.address}</p>}
-              <p><strong>Booking:</strong> {activity.bookingReference || "No booking reference yet."}</p>
+              <p><strong>Booking:</strong> {activity.bookingReference || activity.confirmationReference || "No booking reference yet."}</p>
+              <p><strong>Cost status:</strong> {activity.costStatus || "rough estimate"}{activity.costCad ? `, CAD ${activity.costCad.toLocaleString("en-CA")}` : ""}</p>
+              <p><strong>Route:</strong> {activity.routeLegEstimate || activity.travelTimeFromPrevious || "Travel time missing"}{activity.isRouteEstimate ? " (estimate)" : ""}</p>
+              <p><strong>Source:</strong> {activity.source || "manual"}{activity.sourceId ? `, ${activity.sourceId}` : ""}</p>
+              {needsConfirmation && <p><strong>Needs confirmation:</strong> {(activity.needsConfirmationReasons || ["Cost, timing, or booking details need confirmation."]).join("; ")}</p>}
               <p><strong>Attachments:</strong> {activity.attachmentIds.length ? activity.attachmentIds.join(", ") : "No attachments linked."}</p>
               {activity.imageAlt && <p><strong>Image:</strong> {activity.imageAlt}</p>}
             </div>
@@ -1079,7 +1241,7 @@ interface ActivityListProps {
   brokenImageIds: Set<string>;
   setBrokenImageIds: (ids: Set<string>) => void;
   trip: Trip;
-  cadToJpy: number;
+  exchangeRate: number;
 }
 
 function PlaceBrowser(props: ActivityListProps) {
@@ -1103,7 +1265,7 @@ function PlaceBrowser(props: ActivityListProps) {
   );
 }
 
-function BudgetDashboard({ trip, activities, budget, updateActivity, cadToJpy }: { trip: Trip; activities: TripActivity[]; budget: ReturnType<typeof makeBudget>; updateActivity: (id: string, patch: Partial<TripActivity>) => void; cadToJpy: number }) {
+function BudgetDashboard({ trip, activities, budget, updateActivity, exchangeRate }: { trip: Trip; activities: TripActivity[]; budget: ReturnType<typeof makeBudget>; updateActivity: (id: string, patch: Partial<TripActivity>) => void; exchangeRate: number }) {
   const categoryRows = Object.entries(budget.categories);
   return (
     <section className="content-section">
@@ -1115,9 +1277,9 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, cadToJpy }:
         <CircleDollarSign size={22} aria-hidden="true" />
       </div>
       <div className="budget-hero">
-        <MetricCard label="Low" value={formatMoney(budget.total.low, trip.currency, cadToJpy)} detail="Lean planning estimate" icon={<CircleDollarSign size={18} />} />
-        <MetricCard label="Mid" value={formatMoney(budget.total.mid, trip.currency, cadToJpy)} detail="Main working estimate" icon={<CircleDollarSign size={18} />} />
-        <MetricCard label="High" value={formatMoney(budget.total.high, trip.currency, cadToJpy)} detail="Comfort buffer estimate" icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="Low" value={formatMoney(budget.total.low, trip.currency, exchangeRate)} detail="Lean planning estimate" icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="Mid" value={formatMoney(budget.total.mid, trip.currency, exchangeRate)} detail="Main working estimate" icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="High" value={formatMoney(budget.total.high, trip.currency, exchangeRate)} detail="Comfort buffer estimate" icon={<CircleDollarSign size={18} />} />
       </div>
       <div className="budget-columns">
         <section>
@@ -1125,7 +1287,7 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, cadToJpy }:
           {categoryRows.map(([category, range]) => (
             <div className="budget-row" key={category}>
               <span>{category}</span>
-              <strong>{formatMoney(range.mid, trip.currency, cadToJpy)}</strong>
+              <strong>{formatMoney(range.mid, trip.currency, exchangeRate)}</strong>
             </div>
           ))}
         </section>
@@ -1134,18 +1296,19 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, cadToJpy }:
           {Object.entries(budget.byCity).map(([city, range]) => (
             <div className="budget-row" key={city}>
               <span>{city}</span>
-              <strong>{formatMoney(range.mid, trip.currency, cadToJpy)}</strong>
+              <strong>{formatMoney(range.mid, trip.currency, exchangeRate)}</strong>
             </div>
           ))}
         </section>
       </div>
       <section className="inline-editor">
         <h3>Quick cost edits</h3>
+        <p className="quiet-note">Edits use {trip.currency} as the source currency and recalculate the CAD comparison from the current rough planning rate.</p>
         {activities.slice(0, 12).map((activity) => (
           <label className="budget-edit-row" key={activity.id}>
             <span>{activity.title}</span>
-            <input type="number" min="0" value={activity.estimatedCost} onChange={(event) => updateActivity(activity.id, { estimatedCost: Number(event.target.value) })} />
-            <small>{activity.currency}</small>
+            <input type="number" min="0" value={activity.costLocal ?? activity.estimatedCost} onChange={(event) => updateActivity(activity.id, { estimatedCost: Number(event.target.value) })} />
+            <small>{activity.localCurrencyCode || activity.currency}</small>
           </label>
         ))}
       </section>
@@ -1153,7 +1316,7 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, cadToJpy }:
   );
 }
 
-function LogisticsPanel({ trip, updateHotel, routeSuggestions }: { trip: Trip; updateHotel: (id: string, patch: Partial<TripHotel>) => void; routeSuggestions: RouteSuggestion[] }) {
+function LogisticsPanel({ trip, updateHotel, routeSuggestions, exchangeRate }: { trip: Trip; updateHotel: (id: string, patch: Partial<TripHotel>) => void; routeSuggestions: RouteSuggestion[]; exchangeRate: number }) {
   return (
     <section className="content-section logistics-stack">
       <div className="section-heading">
@@ -1166,7 +1329,7 @@ function LogisticsPanel({ trip, updateHotel, routeSuggestions }: { trip: Trip; u
       <div className="logistics-grid">
         <section>
           <h3>Manual flight tracker</h3>
-          {trip.flights.length ? trip.flights.map((flight) => <FlightCard key={flight.id} flight={flight} />) : <EmptyState title="No flights yet" body="Add manual flight records when booked." />}
+          {trip.flights.length ? trip.flights.map((flight) => <FlightCard key={flight.id} flight={flight} exchangeRate={exchangeRate} tripCurrency={trip.currency} />) : <EmptyState title="No flights yet" body="Add manual flight records when booked." />}
         </section>
         <section>
           <h3>Lodging</h3>
@@ -1174,7 +1337,11 @@ function LogisticsPanel({ trip, updateHotel, routeSuggestions }: { trip: Trip; u
             <article className="logistics-card" key={hotel.id}>
               <p className="eyebrow">{hotel.city}</p>
               <label className="field"><span>Stay</span><input value={hotel.name} onChange={(event) => updateHotel(hotel.id, { name: event.target.value })} /></label>
-              <label className="field"><span>Rough cost</span><input type="number" value={hotel.estimatedCost} onChange={(event) => updateHotel(hotel.id, { estimatedCost: Number(event.target.value) })} /></label>
+              <label className="field"><span>Rough cost ({hotel.localCurrencyCode || hotel.currency})</span><input type="number" value={hotel.costLocal ?? hotel.estimatedCost} onChange={(event) => updateHotel(hotel.id, { estimatedCost: Number(event.target.value) })} /></label>
+              <div className="mini-tags">
+                <span>{formatMoney(hotel.costLocal ?? hotel.estimatedCost, hotel.localCurrencyCode || hotel.currency, exchangeRate)}</span>
+                <span>{hotel.costStatus || "rough estimate"}</span>
+              </div>
               <p>{hotel.notes || "No hotel notes yet."}</p>
             </article>
           )) : <EmptyState title="No hotels yet" body="Lodging cards are ready when you add stays." />}
@@ -1195,7 +1362,7 @@ function LogisticsPanel({ trip, updateHotel, routeSuggestions }: { trip: Trip; u
   );
 }
 
-function FlightCard({ flight }: { flight: TripFlight }) {
+function FlightCard({ flight, exchangeRate, tripCurrency }: { flight: TripFlight; exchangeRate: number; tripCurrency: string }) {
   return (
     <article className="logistics-card">
       <p className="eyebrow">Manual status, not live</p>
@@ -1204,6 +1371,7 @@ function FlightCard({ flight }: { flight: TripFlight }) {
       <div className="mini-tags">
         <span>{formatDate(flight.departureTime.slice(0, 10))}</span>
         <span>{flight.status}</span>
+        {(flight.costLocal || flight.costCad) && <span>{formatMoney(flight.costLocal ?? Math.round((flight.costCad || 0) * exchangeRate), flight.localCurrencyCode || tripCurrency, exchangeRate)}</span>}
       </div>
       <p>{flight.notes}</p>
     </article>
@@ -1223,7 +1391,7 @@ function AttachmentCard({ attachment }: { attachment: TripAttachment }) {
   );
 }
 
-function MapsExport({ trip, activities, allActivities, copyRows, downloadCsv }: { trip: Trip; activities: TripActivity[]; allActivities: TripActivity[]; copyRows: (rows: ReturnType<typeof exportRows>) => Promise<void>; downloadCsv: (rows?: ReturnType<typeof exportRows>) => void }) {
+function MapsExport({ trip, activities, allActivities, copyRows, downloadCsv, exchangeRate }: { trip: Trip; activities: TripActivity[]; allActivities: TripActivity[]; copyRows: (rows: ReturnType<typeof exportRows>) => Promise<void>; downloadCsv: (rows?: ReturnType<typeof exportRows>) => void; exchangeRate: number }) {
   const rows = exportRows(activities);
   const categories = Array.from(new Set(allActivities.map((activity) => activity.category))).sort();
   const days = Array.from(new Set(allActivities.map((activity) => activity.day))).sort((a, b) => a - b);
@@ -1272,7 +1440,7 @@ function MapsExport({ trip, activities, allActivities, copyRows, downloadCsv }: 
             <article className="maps-row" key={`${row.day}-${row.place}`}>
               <strong>{row.place}</strong>
               <span>{row.address || row.query}</span>
-              <small>Day {row.day} | {row.category} | {row.estimatedCost} {row.currency} | {row.travelTime || "travel time TBD"}</small>
+              <small>Day {row.day} | {row.category} | {formatMoney(row.estimatedCost, row.currency, exchangeRate)} | {row.travelTime || "travel time TBD"}{row.costStatus ? ` | ${row.costStatus}` : ""}</small>
             </article>
           ))}
         </div>
@@ -1315,6 +1483,99 @@ function AssistantPanel({ trip, activities, routeSuggestions }: { trip: Trip; ac
           {cheaper.length ? cheaper.map((activity) => <p key={activity.id}><strong>{activity.title}:</strong> mark this optional or compare a lower-cost day plan.</p>) : <EmptyState title="No high-cost flags" body="Budget edits will update this list." />}
         </section>
       </div>
+    </section>
+  );
+}
+
+function ImportPanel({ trip, replaceActiveTrip }: { trip: Trip; replaceActiveTrip: (trip: Trip) => void }) {
+  const [wanderlogText, setWanderlogText] = useState("");
+  const [googleDocText, setGoogleDocText] = useState("");
+  const [backupText, setBackupText] = useState("");
+  const [message, setMessage] = useState("Pasted data is preview-only until you explicitly apply a JSON backup.");
+  const isPeru = trip.id === "peru-2026";
+
+  function previewPaste() {
+    const wanderlogLines = wanderlogText.split(/\r?\n/).filter((line) => line.trim()).length;
+    const googleLines = googleDocText.split(/\r?\n/).filter((line) => line.trim()).length;
+    setMessage(`Preview only: ${wanderlogLines} Wanderlog lines and ${googleLines} Google Doc note lines detected. Unclear items should stay marked needs confirmation.`);
+  }
+
+  function previewBackup() {
+    try {
+      const parsed = JSON.parse(backupText) as Trip;
+      setMessage(`Backup preview: ${parsed.title || "Untitled trip"} with ${parsed.activities?.length || 0} cards, ${parsed.flights?.length || 0} flights, and ${parsed.hotels?.length || 0} hotels.`);
+    } catch {
+      setMessage("JSON backup could not be parsed yet.");
+    }
+  }
+
+  function applyBackup() {
+    try {
+      const parsed = JSON.parse(backupText) as Trip;
+      if (parsed.id !== trip.id) {
+        setMessage(`This backup is for ${parsed.id || "another trip"}, not ${trip.id}.`);
+        return;
+      }
+      if (!window.confirm(`Replace ${trip.title} with this JSON backup?`)) return;
+      replaceActiveTrip(parsed);
+      setMessage("JSON backup applied locally.");
+    } catch {
+      setMessage("JSON backup could not be applied.");
+    }
+  }
+
+  function downloadBackup() {
+    const blob = new Blob([JSON.stringify(trip, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${trip.id}-backup.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <section className="content-section import-panel">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Non-destructive import</p>
+          <h2>{trip.title} import and backup</h2>
+        </div>
+        <Import size={22} aria-hidden="true" />
+      </div>
+
+      {isPeru && (
+        <div className="source-note">
+          <h3>Peru source status</h3>
+          <p>Public Wanderlog state is already imported: 55 dated cards, 4 flights, 10 lodging blocks, 2 train/transit blocks, and 19 CAD expenses. The Google Doc export redirects to sign-in, so its notes need to be pasted here before they can be used.</p>
+        </div>
+      )}
+
+      <div className="textarea-grid">
+        <label className="field">
+          <span>Paste Wanderlog text or JSON</span>
+          <textarea value={wanderlogText} onChange={(event) => setWanderlogText(event.target.value)} placeholder="Paste Wanderlog export here" />
+        </label>
+        <label className="field">
+          <span>Paste Google Doc notes</span>
+          <textarea value={googleDocText} onChange={(event) => setGoogleDocText(event.target.value)} placeholder="Add Google Doc note" />
+        </label>
+      </div>
+
+      <div className="maps-toolbar">
+        <button className="ghost-button" type="button" onClick={previewPaste}><Clipboard size={17} /> Preview pasted notes</button>
+        <button className="primary-button" type="button" onClick={downloadBackup}><Download size={17} /> Export JSON backup</button>
+      </div>
+
+      <label className="field">
+        <span>Restore from JSON backup</span>
+        <textarea value={backupText} onChange={(event) => setBackupText(event.target.value)} placeholder={`Paste a ${trip.id} JSON backup here`} />
+      </label>
+      <div className="maps-toolbar">
+        <button className="ghost-button" type="button" onClick={previewBackup}>Preview JSON backup</button>
+        <button className="danger-button" type="button" onClick={applyBackup}>Apply JSON backup</button>
+      </div>
+      <p className="quiet-note">{message}</p>
     </section>
   );
 }

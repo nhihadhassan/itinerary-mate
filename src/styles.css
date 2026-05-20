@@ -236,7 +236,7 @@ img {
   top: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 4px;
   margin: 8px 0 16px;
   border: 1px solid var(--line);
@@ -1051,6 +1051,10 @@ img {
   }
 }
 
+.wanderlog-timeline {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 @media (max-width: 520px) {
   .app-shell {
     padding: 10px;
@@ -1081,7 +1085,7 @@ img {
 
   .nav-tabs {
     overflow-x: auto;
-    grid-template-columns: repeat(5, minmax(92px, 1fr));
+    grid-template-columns: repeat(8, minmax(92px, 1fr));
   }
 
   .hero-panel {
@@ -1236,6 +1240,123 @@ img {
   padding: 2px 2px 4px;
 }
 
+.day-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 253, 248, 0.84);
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+
+.day-details {
+  display: grid;
+  gap: 12px;
+}
+
+.day-details[open] {
+  display: grid;
+}
+
+.day-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.day-summary::-webkit-details-marker {
+  display: none;
+}
+
+.route-summary,
+.address-line,
+.source-note p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.route-summary {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.timeline-item {
+  display: grid;
+  gap: 8px;
+}
+
+.route-connector {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  margin-left: 18px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.route-connector::before {
+  content: "";
+  inline-size: 2px;
+  block-size: 24px;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+
+.route-connector em,
+.needs-confirmation {
+  color: var(--amber);
+  font-style: normal;
+  font-weight: 750;
+}
+
+.address-line {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+.address-line svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.place-card.type-flight,
+.place-card.type-transport {
+  background: color-mix(in srgb, var(--blue-soft) 38%, var(--surface-strong));
+}
+
+.place-card.type-hotel {
+  background: color-mix(in srgb, var(--green-2) 34%, var(--surface-strong));
+}
+
+.place-card.type-food {
+  background: color-mix(in srgb, var(--amber-soft) 34%, var(--surface-strong));
+}
+
+.import-panel,
+.source-note,
+.textarea-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.source-note {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--blue-soft);
+  padding: 14px;
+}
+
+.textarea-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.import-panel textarea {
+  min-height: 160px;
+}
+
 :root[data-theme="dark"] .card,
 :root[data-theme="dark"] .hero-panel,
 :root[data-theme="dark"] .filter-bar,
@@ -1253,6 +1374,14 @@ img {
   border-color: var(--line);
   background: rgba(23, 33, 30, 0.9);
   box-shadow: none;
+}
+
+:root[data-theme="dark"] .place-card.type-flight,
+:root[data-theme="dark"] .place-card.type-transport,
+:root[data-theme="dark"] .place-card.type-hotel,
+:root[data-theme="dark"] .place-card.type-food,
+:root[data-theme="dark"] .source-note {
+  background: rgba(23, 33, 30, 0.94);
 }
 
 :root[data-theme="dark"] .search-field,
@@ -1402,7 +1531,7 @@ img {
 
 @media (min-width: 900px) {
   .nav-tabs {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(8, minmax(0, 1fr));
   }
 }
 
@@ -1416,7 +1545,7 @@ img {
   }
 
   .nav-tabs {
-    grid-template-columns: repeat(7, minmax(94px, 1fr));
+    grid-template-columns: repeat(8, minmax(94px, 1fr));
   }
 
   .budget-edit-row {

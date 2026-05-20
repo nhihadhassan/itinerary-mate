@@ -1,5 +1,9 @@
 export type TripId = "japan-2026" | "peru-2026";
 export type TripCurrency = "JPY" | "CAD" | "PEN" | "USD";
+export type TripActivityType = "activity" | "food" | "hotel" | "flight" | "transport" | "note";
+export type TripSource = "japan-default" | "Wanderlog" | "Google Doc" | "manual" | "placeholder" | "needs confirmation";
+export type CostStatus = "imported" | "converted-estimate" | "needs-confirmation" | "manual";
+export type BookingStatus = "booked" | "not-booked" | "optional" | "needs-confirmation";
 export type TripCategory =
   | "Must See"
   | "Non-Negotiable"
@@ -18,8 +22,10 @@ export interface TripActivity {
   day: number;
   date?: string;
   city: string;
+  region?: string;
   country: string;
   title: string;
+  type?: TripActivityType;
   description: string;
   category: TripCategory;
   address?: string;
@@ -36,7 +42,14 @@ export interface TripActivity {
   estimatedCostMid?: number;
   estimatedCostHigh?: number;
   currency: TripCurrency;
+  costLocal?: number;
+  localCurrencyCode?: TripCurrency;
+  costCad?: number;
+  costCategory?: "flight" | "hotel" | "food" | "activity" | "transport" | "misc";
+  costStatus?: CostStatus;
+  bookingStatus?: BookingStatus;
   bookingReference?: string;
+  confirmationReference?: string;
   flightInfo?: TripFlight;
   hotelInfo?: TripHotel;
   attachmentIds: string[];
@@ -46,7 +59,12 @@ export interface TripActivity {
   priority: number;
   isBooked: boolean;
   isCompleted: boolean;
-  source?: "japan-default" | "wanderlog" | "manual" | "placeholder";
+  source?: TripSource;
+  sourceId?: string;
+  sourceUrl?: string;
+  needsConfirmationReasons?: string[];
+  routeLegEstimate?: string;
+  isRouteEstimate?: boolean;
   branch?: string;
 }
 
@@ -62,6 +80,11 @@ export interface TripFlight {
   confirmation?: string;
   status: "manual / not live yet" | "booked" | "pending" | "completed" | "cancelled";
   notes?: string;
+  costCad?: number;
+  costLocal?: number;
+  localCurrencyCode?: TripCurrency;
+  source?: TripSource;
+  sourceId?: string;
 }
 
 export interface TripHotel {
@@ -75,10 +98,24 @@ export interface TripHotel {
   checkOut?: string;
   estimatedCost: number;
   currency: TripCurrency;
+  costCad?: number;
+  costLocal?: number;
+  localCurrencyCode?: TripCurrency;
+  costStatus?: CostStatus;
+  source?: TripSource;
+  sourceId?: string;
   confirmation?: string;
   notes?: string;
   latitude?: number;
   longitude?: number;
+}
+
+export interface TripCurrencyConfig {
+  localCurrency: TripCurrency;
+  comparisonCurrency: "CAD";
+  localPerCad: number;
+  label: string;
+  isEstimate: boolean;
 }
 
 export interface TripAttachment {
@@ -110,6 +147,7 @@ export interface Trip {
   startDate?: string;
   endDate?: string;
   currency: TripCurrency;
+  currencyConfig?: TripCurrencyConfig;
   description: string;
   activities: TripActivity[];
   flights: TripFlight[];

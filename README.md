@@ -3,7 +3,7 @@
 Itinerary Mate is a local-first multi-trip itinerary tracker built with Vite, React, and TypeScript. It currently includes:
 
 - Japan Trip: the original September 1-30, 2026 planner with JPY source budgets and CAD comparison.
-- Peru Trip: a July 11-26, 2026 seed itinerary based on the public Wanderlog plan, including Cusco, the Sacred Valley, Machu Picchu, Arequipa, Colca Canyon, Paracas, Huacachina, Lima, flights, hotels, and rough CAD costs.
+- Peru Trip: a July 11-26, 2026 Wanderlog import with 55 dated cards, 4 flights, 10 lodging blocks, 2 train/transit blocks, 19 imported CAD expenses, and PEN + CAD planning displays.
 
 The app is designed as a travel command center: editable cards, budget dashboards, lodging and flight tracking, attachment placeholders, route suggestions, Google Maps export, CSV export, dark mode, and offline-ready PWA basics.
 
@@ -49,12 +49,25 @@ pnpm preview
 
 ## Peru Import Workflow
 
-The Google Doc source may require sign-in, so the current Peru seed uses the publicly readable Wanderlog state. To add more exact notes later:
+The Google Doc source currently redirects document export to Google sign-in, so the app treats it as "needs paste/export" until you provide the content. The public Wanderlog state is already imported as the Peru source of truth.
 
-1. Open `src/importTemplates/peruWanderlogTemplate.ts`.
-2. Paste each real item into the template shape: day, date, place, address, travel time, cost, flight details, hotel details, notes, attachments, and coordinates.
-3. Convert the pasted items into `TripActivity` records in `src/peruItinerary.ts`.
-4. Keep private documents out of localStorage. Attachment records are metadata only for now.
+You can use the in-app **Import** tab to:
+
+1. Paste Wanderlog text or JSON for preview.
+2. Paste Google Doc notes after exporting or copying them manually.
+3. Export a JSON backup of the active trip.
+4. Restore a JSON backup only after explicit confirmation.
+
+The code template in `src/importTemplates/peruWanderlogTemplate.ts` remains available for structured manual imports with day, date, place, address, travel time, cost, flight details, hotel details, notes, attachments, and coordinates.
+
+Keep private documents out of localStorage. Attachment records are metadata only for now.
+
+## Currency
+
+- Japan uses JPY as the source currency and CAD as the comparison currency.
+- Peru uses PEN as the local trip currency and CAD as the comparison currency.
+- Peru's public Wanderlog expenses were imported in CAD, then converted to rough PEN using the editable planning rate `1 CAD = 2.5 PEN`.
+- Exchange rates are planning estimates, not live financial quotes.
 
 ## Offline And PWA Notes
 
