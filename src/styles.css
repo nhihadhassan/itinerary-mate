@@ -14,6 +14,10 @@
   --line-strong: #c6d4cb;
   --green: #285f48;
   --green-2: #dbeee5;
+  --trip-accent: #285f48;
+  --trip-accent-2: #dbeee5;
+  --trip-warm: #d89d61;
+  --trip-visual-ink: rgba(24, 33, 31, 0.62);
   --red: #9a3412;
   --red-soft: #fff1e9;
   --amber: #8a5b05;
@@ -35,6 +39,10 @@
   --line-strong: #42564e;
   --green: #9dd6b8;
   --green-2: #1d372b;
+  --trip-accent: #9dd6b8;
+  --trip-accent-2: #1d372b;
+  --trip-warm: #ddb46f;
+  --trip-visual-ink: rgba(238, 244, 237, 0.7);
   --red: #ffb09a;
   --red-soft: #3a1b14;
   --amber: #f2ca74;
@@ -134,6 +142,32 @@ img {
   padding: 16px;
 }
 
+.app-shell.trip-japan {
+  --trip-accent: #285f48;
+  --trip-accent-2: #dbeee5;
+  --trip-warm: #d99c5a;
+}
+
+.app-shell.trip-peru {
+  --trip-accent: #786038;
+  --trip-accent-2: #f0dfc5;
+  --trip-warm: #bf6f4a;
+  --green: #416d54;
+  --green-2: #e1eadc;
+  --blue: #33697a;
+  --blue-soft: #e2eff1;
+}
+
+:root[data-theme="dark"] .app-shell.trip-peru {
+  --trip-accent: #e0c07d;
+  --trip-accent-2: #362f21;
+  --trip-warm: #e0a077;
+  --green: #a8c7aa;
+  --green-2: #263423;
+  --blue: #a7d2de;
+  --blue-soft: #1d3034;
+}
+
 .skip-link {
   position: absolute;
   left: 16px;
@@ -192,7 +226,7 @@ img {
 }
 
 .trip-switcher button.active {
-  background: var(--ink);
+  background: linear-gradient(135deg, var(--ink), color-mix(in srgb, var(--trip-accent) 62%, var(--ink)));
   color: var(--surface);
 }
 
@@ -227,8 +261,8 @@ img {
 }
 
 .save-pill {
-  color: var(--green);
-  border-color: rgba(40, 95, 72, 0.2);
+  color: var(--trip-accent);
+  border-color: color-mix(in srgb, var(--trip-accent) 24%, var(--line));
 }
 
 .nav-tabs {
@@ -687,6 +721,11 @@ img {
   gap: 12px;
   overflow: hidden;
   padding: 10px;
+  border-color: color-mix(in srgb, var(--line) 78%, var(--trip-accent));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), transparent 38%),
+    rgba(255, 253, 248, 0.9);
+  box-shadow: 0 18px 44px rgba(43, 54, 49, 0.08);
 }
 
 .place-card.completed {
@@ -1193,12 +1232,132 @@ img {
   overflow: hidden;
   border-radius: var(--radius) var(--radius) 0 0;
   background: var(--soft);
+  isolation: isolate;
 }
 
 .card-image img {
   inline-size: 100%;
   block-size: 100%;
   object-fit: cover;
+  opacity: 0;
+  transform: scale(1.015);
+  transition:
+    opacity 260ms ease,
+    transform 600ms ease;
+}
+
+.card-image img.loaded {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.card-image.has-photo::after,
+.card-image.fallback-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.05), transparent 38%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.38), transparent 56%);
+}
+
+.image-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(110deg, transparent 0 32%, rgba(255, 255, 255, 0.42) 42%, transparent 52%),
+    linear-gradient(135deg, var(--soft), color-mix(in srgb, var(--trip-accent-2) 76%, white));
+  background-size: 240% 100%, 100% 100%;
+  animation: image-sheen 1.45s ease-in-out infinite;
+}
+
+.card-image.has-photo:not(.is-loading) .image-skeleton {
+  display: none;
+}
+
+.fallback-visual {
+  display: grid;
+  place-items: stretch;
+  color: var(--trip-visual-ink);
+}
+
+.fallback-visual::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--trip-warm) 26%, transparent), transparent 28%),
+    radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--trip-accent) 24%, transparent), transparent 26%),
+    linear-gradient(135deg, color-mix(in srgb, var(--trip-accent-2) 84%, white), color-mix(in srgb, var(--blue-soft) 56%, white));
+}
+
+.fallback-visual-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-content: end;
+  min-block-size: 100%;
+  gap: 8px;
+  padding: 18px;
+}
+
+.fallback-visual-content::before {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--trip-accent) 18%, transparent);
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--trip-accent) 15%, transparent) 1px, transparent 1px),
+    linear-gradient(0deg, color-mix(in srgb, var(--trip-accent) 12%, transparent) 1px, transparent 1px);
+  background-size: 36px 36px;
+  opacity: 0.72;
+}
+
+.fallback-visual-content span,
+.fallback-visual-content small {
+  justify-self: start;
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.72);
+  padding: 5px 9px;
+  color: color-mix(in srgb, var(--ink) 74%, var(--trip-accent));
+  font-size: 0.74rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.fallback-visual-content strong {
+  color: color-mix(in srgb, var(--ink) 78%, var(--trip-accent));
+  font-size: clamp(2.5rem, 9vw, 5.5rem);
+  line-height: 0.82;
+  letter-spacing: 0;
+}
+
+:root[data-theme="dark"] .fallback-visual-content span,
+:root[data-theme="dark"] .fallback-visual-content small {
+  background: rgba(16, 24, 22, 0.7);
+}
+
+@keyframes image-sheen {
+  from {
+    background-position: 180% 0, 0 0;
+  }
+
+  to {
+    background-position: -80% 0, 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-skeleton {
+    animation: none;
+  }
 }
 
 .category-badge {
@@ -1325,14 +1484,17 @@ img {
 .place-card.type-flight,
 .place-card.type-transport {
   background: color-mix(in srgb, var(--blue-soft) 38%, var(--surface-strong));
+  border-color: color-mix(in srgb, var(--blue) 24%, var(--line));
 }
 
 .place-card.type-hotel {
   background: color-mix(in srgb, var(--green-2) 34%, var(--surface-strong));
+  border-color: color-mix(in srgb, var(--green) 22%, var(--line));
 }
 
 .place-card.type-food {
   background: color-mix(in srgb, var(--amber-soft) 34%, var(--surface-strong));
+  border-color: color-mix(in srgb, var(--amber) 22%, var(--line));
 }
 
 .import-panel,
@@ -1532,6 +1694,29 @@ img {
 @media (min-width: 900px) {
   .nav-tabs {
     grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+
+  .wanderlog-timeline .place-card {
+    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 14px;
+    padding: 12px;
+  }
+
+  .wanderlog-timeline .card-image {
+    min-block-size: 100%;
+    aspect-ratio: auto;
+    border-radius: 7px;
+  }
+
+  .wanderlog-timeline .card-body {
+    padding: 4px 2px;
+    align-content: start;
+  }
+
+  .wanderlog-timeline .meta-chips span {
+    min-height: 28px;
+    padding: 5px 9px;
   }
 }
 

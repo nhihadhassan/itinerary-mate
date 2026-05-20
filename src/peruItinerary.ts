@@ -8,6 +8,54 @@ export const PERU_WANDERLOG_PDF_SOURCE = "/Users/nhihad/Downloads/Trip to Peru �
 const scenic = (name: string) =>
   `linear-gradient(135deg, hsl(${Math.abs([...name].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % 360} 48% 86%) 0%, #f7efe0 52%, #dceee7 100%)`;
 
+const commonsDirectUrls: Record<string, string> = {
+  "Vista de Cusco, Perú, 2015-07-31, DD 11-17 PAN.JPG":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Vista_de_Cusco%2C_Per%C3%BA%2C_2015-07-31%2C_DD_11-17_PAN.JPG/1280px-Vista_de_Cusco%2C_Per%C3%BA%2C_2015-07-31%2C_DD_11-17_PAN.JPG",
+  "Qorikancha Cusco, Peru.jpg":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Qorikancha_Cusco%2C_Peru.jpg/1280px-Qorikancha_Cusco%2C_Peru.jpg",
+  "Saqsaywaman, cusco, peru - panoramio.jpg":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Saqsaywaman%2C_cusco%2C_peru_-_panoramio.jpg/1280px-Saqsaywaman%2C_cusco%2C_peru_-_panoramio.jpg",
+  "Pisac archaeological site.jpg":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Pisac_archaeological_site.jpg/1280px-Pisac_archaeological_site.jpg",
+  "Awana Kancha - panoramio.jpg": "https://upload.wikimedia.org/wikipedia/commons/1/14/Awana_Kancha_-_panoramio.jpg",
+};
+
+const commonsFile = (fileName: string) =>
+  commonsDirectUrls[fileName] || `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileName)}?width=1200`;
+
+const commonsPage = (fileName: string) =>
+  `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(fileName.replace(/ /g, "_"))}`;
+
+function commonsImage(fileName: string, alt: string, searchQuery: string): Partial<TripActivity> {
+  return {
+    imageUrl: commonsFile(fileName),
+    imageAlt: alt,
+    imageCredit: "Wikimedia Commons",
+    imageCreditUrl: commonsPage(fileName),
+    imageLicense: "See Wikimedia Commons file page",
+    imageSearchQuery: searchQuery,
+  };
+}
+
+const peruImageCatalog: Record<string, Partial<TripActivity>> = {
+  "Samay Wasi Youth Hostels Cusco": commonsImage("Vista de Cusco, Perú, 2015-07-31, DD 11-17 PAN.JPG", "Cusco rooftops and mountains in Peru.", "Cusco Peru old town"),
+  Qorikancha: commonsImage("Qorikancha Cusco, Peru.jpg", "Qorikancha stone walls in Cusco.", "Qorikancha Cusco Peru"),
+  Saqsaywaman: commonsImage("Saqsaywaman, cusco, peru - panoramio.jpg", "Stone terraces at Saqsaywaman near Cusco.", "Saqsaywaman Cusco Peru"),
+  "Parque Arqueológico Pisac": commonsImage("Pisac archaeological site.jpg", "Terraces at the Pisac archaeological site.", "Pisac archaeological site Peru"),
+  "Awana Kancha": commonsImage("Awana Kancha - panoramio.jpg", "Textile and alpaca stop near Cusco.", "Awana Kancha Peru"),
+  "Zona Arqueologica Moray": commonsImage("View of Inca terraces of Moray, 2018.jpg", "Circular terraces at Moray.", "Moray terraces Peru"),
+  Maras: commonsImage("Salineras de Maras, Maras, Perú, 2015-07-30, DD 12.JPG", "Salt ponds at Maras.", "Salineras de Maras Peru"),
+  "Ollantaytambo Archeological Site": commonsImage("Ollantaytambo terraces.jpg", "Terraces at Ollantaytambo archaeological site.", "Ollantaytambo archaeological site Peru"),
+  "Aguas Calientes": commonsImage("Aguas Calientes, Cuzco, Perú, 2015-07-30, DD 68.JPG", "Aguas Calientes town below Machu Picchu.", "Aguas Calientes Peru"),
+  "Historic Sanctuary of Machu Picchu": commonsImage("Machu Picchu, Perú, 2015-07-30, DD 47.JPG", "Machu Picchu from above.", "Machu Picchu Peru"),
+  Ollantaytambo: commonsImage("Ollantaytambo terraces.jpg", "Ollantaytambo town and surrounding mountains.", "Ollantaytambo Peru"),
+  Cusco: commonsImage("Vista de Cusco, Perú, 2015-07-31, DD 11-17 PAN.JPG", "Cusco city with mountains in the background.", "Cusco Peru"),
+  Vinicunca: commonsImage("Montaña de colores en Cuzco Perú.jpg", "Rainbow Mountain in Peru.", "Vinicunca Rainbow Mountain Peru"),
+  Arequipa: commonsImage("Arequipa - Plaza de Armas - panoramio (1).jpg", "Arequipa Plaza de Armas with volcano backdrop.", "Arequipa Peru Plaza de Armas"),
+  "Santa Catalina Monastery": commonsImage("Santa Catalina Monastery, Arequipa - 53032077180.jpg", "Colorful corridor inside Santa Catalina Monastery.", "Santa Catalina Monastery Arequipa"),
+  "Plaza de Armas Arequipa": commonsImage("Arequipa - Plaza de Armas - panoramio (1).jpg", "Arequipa Plaza de Armas.", "Plaza de Armas Arequipa"),
+};
+
 export const peruDayRouteSummaries: Record<number, string> = {
   1: "3 days 1 hr, 4,111 mi. Toronto -> Cancun -> Lima -> Cusco -> Samay Wasi.",
   2: "2 hrs 55 mins, 9 mi. Cusco ruins loop from Samay Wasi.",
@@ -3129,13 +3177,16 @@ export const peruActivities: TripActivity[] = [
   }
 ].map((activity) => {
   const pdfDetails = pdfActivityDetails[`${activity.day}|${activity.title}`];
+  const imageDetails = peruImageCatalog[activity.title];
   const needsConfirmationReasons = pdfDetails
     ? activity.needsConfirmationReasons?.filter((reason) => reason !== "Exact route time missing from Wanderlog" && !(pdfDetails.startTime && reason === "Start time missing"))
     : activity.needsConfirmationReasons;
   return {
     ...activity,
     ...pdfDetails,
-    imageUrl: activity.imageUrl || scenic(activity.title),
+    ...imageDetails,
+    imageUrl: imageDetails?.imageUrl || activity.imageUrl || scenic(activity.title),
+    imageAlt: imageDetails?.imageAlt || activity.imageAlt || `Generated visual for ${activity.title}.`,
     notes: [pdfDetails?.notes, activity.notes].filter(Boolean).join("\n"),
     source: pdfDetails ? "Wanderlog PDF" : activity.source,
     needsConfirmationReasons,

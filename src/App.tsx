@@ -113,6 +113,22 @@ function placeholderFor(text: string) {
   return `linear-gradient(135deg, hsl(${hue} 45% 84%) 0%, hsl(${(hue + 42) % 360} 38% 92%) 52%, hsl(${(hue + 118) % 360} 35% 87%) 100%)`;
 }
 
+function isImageUrl(url?: string) {
+  if (!url) return false;
+  return /^(https?:\/\/|\/)/.test(url) && !url.startsWith("linear-gradient");
+}
+
+function placeInitials(title: string) {
+  const words = title.replace(/[^\p{L}\p{N}\s']/gu, " ").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "IM";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+}
+
+function visualKicker(activity: TripActivity) {
+  return activity.region || activity.city || activity.country || activity.category;
+}
+
 function parseStored<T>(key: string): T | null {
   try {
     const stored = localStorage.getItem(key);
@@ -169,6 +185,10 @@ function japanActivityToTripActivity(activity: Activity): TripActivity {
     notes: activity.notes,
     imageUrl: activity.imageUrl || placeholderFor(activity.title),
     imageAlt: activity.imageAlt,
+    imageCredit: activity.imageCredit,
+    imageCreditUrl: activity.imageCreditUrl,
+    imageLicense: activity.imageLicense,
+    imageSearchQuery: activity.imageSearchQuery,
     priority: activity.priority,
     isBooked: activity.isBooked,
     isCompleted: activity.isCompleted,
@@ -260,6 +280,8 @@ function mergeTrip(defaultTrip: Trip, storedTrip?: Trip): Trip {
   const editableMerge = (base: TripActivity, stored?: TripActivity): TripActivity => {
     if (!stored) return base;
     const sameCurrency = stored.currency === base.currency;
+    const storedImageLooksAuto = stored.tripId === "peru-2026" && stored.imageCredit === "Wikimedia Commons";
+    const shouldUseBaseImage = storedImageLooksAuto || (isImageUrl(base.imageUrl) && !isImageUrl(stored.imageUrl));
     return {
       ...base,
       notes: mergeNotes(base.notes, stored.notes),
@@ -274,7 +296,12 @@ function mergeTrip(defaultTrip: Trip, storedTrip?: Trip): Trip {
       costLocal: sameCurrency ? stored.costLocal ?? stored.estimatedCost : base.costLocal,
       costCad: sameCurrency ? stored.costCad ?? base.costCad : base.costCad,
       costStatus: sameCurrency ? stored.costStatus || base.costStatus : base.costStatus,
-      imageUrl: stored.imageUrl || base.imageUrl || placeholderFor(base.title),
+      imageUrl: shouldUseBaseImage ? base.imageUrl || placeholderFor(base.title) : stored.imageUrl || base.imageUrl || placeholderFor(base.title),
+      imageAlt: shouldUseBaseImage ? base.imageAlt : stored.imageAlt || base.imageAlt,
+      imageCredit: shouldUseBaseImage ? base.imageCredit : stored.imageCredit || base.imageCredit,
+      imageCreditUrl: shouldUseBaseImage ? base.imageCreditUrl : stored.imageCreditUrl || base.imageCreditUrl,
+      imageLicense: shouldUseBaseImage ? base.imageLicense : stored.imageLicense || base.imageLicense,
+      imageSearchQuery: shouldUseBaseImage ? base.imageSearchQuery : stored.imageSearchQuery || base.imageSearchQuery,
       attachmentIds: stored.attachmentIds?.length ? stored.attachmentIds : base.attachmentIds ?? [],
     };
   };
@@ -445,6 +472,7 @@ function App() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState("Saved locally");
   const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(() => new Set());
+  const [loadedImageIds, setLoadedImageIds] = useState<Set<string>>(() => new Set());
   const [systemDark, setSystemDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
 
   const sensors = useSensors(
@@ -708,7 +736,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell trip-${activeTrip.id === "peru-2026" ? "peru" : "japan"}`}>
       <header className="topbar">
         <a className="skip-link" href="#main-content">Skip to itinerary</a>
         <div className="brand-block">
@@ -809,6 +837,8 @@ function App() {
                 deleteActivity={deleteActivity}
                 brokenImageIds={brokenImageIds}
                 setBrokenImageIds={setBrokenImageIds}
+                loadedImageIds={loadedImageIds}
+                setLoadedImageIds={setLoadedImageIds}
                 trip={activeTrip}
                 exchangeRate={activeExchangeRate}
               />
@@ -824,6 +854,8 @@ function App() {
               deleteActivity={deleteActivity}
               brokenImageIds={brokenImageIds}
               setBrokenImageIds={setBrokenImageIds}
+              loadedImageIds={loadedImageIds}
+              setLoadedImageIds={setLoadedImageIds}
               trip={activeTrip}
               exchangeRate={activeExchangeRate}
             />
@@ -1092,6 +1124,8 @@ function ItineraryTimeline(props: {
   deleteActivity: (id: string) => void;
   brokenImageIds: Set<string>;
   setBrokenImageIds: (ids: Set<string>) => void;
+  loadedImageIds: Set<string>;
+  setLoadedImageIds: (ids: Set<string>) => void;
   trip: Trip;
   exchangeRate: number;
 }) {
@@ -1156,6 +1190,8 @@ function ActivityCard({
   deleteActivity,
   brokenImageIds,
   setBrokenImageIds,
+  loadedImageIds,
+  setLoadedImageIds,
   trip,
   exchangeRate,
 }: {
@@ -1166,18 +1202,40 @@ function ActivityCard({
   deleteActivity: (id: string) => void;
   brokenImageIds: Set<string>;
   setBrokenImageIds: (ids: Set<string>) => void;
+  loadedImageIds: Set<string>;
+  setLoadedImageIds: (ids: Set<string>) => void;
   trip: Trip;
   exchangeRate: number;
 }) {
   const expanded = expandedId === activity.id;
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: activity.id });
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
-  const hasImage = activity.imageUrl && !activity.imageUrl.startsWith("linear-gradient") && !brokenImageIds.has(activity.id);
+  const hasImage = isImageUrl(activity.imageUrl) && !brokenImageIds.has(activity.id);
+  const imageLoaded = loadedImageIds.has(activity.id);
   const needsConfirmation = Boolean(activity.needsConfirmationReasons?.length || activity.costStatus === "needs-confirmation" || activity.bookingStatus === "needs-confirmation");
   return (
     <article className={`place-card type-${activity.type || "activity"}${activity.isCompleted ? " completed" : ""}`} ref={setNodeRef} style={style}>
-      <div className="card-image" style={{ background: hasImage ? undefined : activity.imageUrl || placeholderFor(activity.title) }}>
-        {hasImage && <img src={activity.imageUrl} alt={activity.imageAlt || activity.title} loading="lazy" onError={() => setBrokenImageIds(new Set([...brokenImageIds, activity.id]))} />}
+      <div className={`card-image ${hasImage ? "has-photo" : "fallback-visual"} ${hasImage && !imageLoaded ? "is-loading" : ""}`} style={{ background: hasImage ? undefined : activity.imageUrl || placeholderFor(activity.title) }}>
+        {hasImage ? (
+          <>
+            <span className="image-skeleton" aria-hidden="true" />
+            <img
+              src={activity.imageUrl}
+              alt={activity.imageAlt || activity.title}
+              loading="lazy"
+              decoding="async"
+              className={imageLoaded ? "loaded" : ""}
+              onLoad={() => setLoadedImageIds(new Set([...loadedImageIds, activity.id]))}
+              onError={() => setBrokenImageIds(new Set([...brokenImageIds, activity.id]))}
+            />
+          </>
+        ) : (
+          <div className="fallback-visual-content" aria-hidden="true">
+            <span>{visualKicker(activity)}</span>
+            <strong>{placeInitials(activity.title)}</strong>
+            <small>{activity.type || activity.category}</small>
+          </div>
+        )}
         <button className="drag-handle" type="button" {...listeners} {...attributes} aria-label={`Drag ${activity.title}`}>
           <GripVertical size={16} aria-hidden="true" />
         </button>
@@ -1231,6 +1289,13 @@ function ActivityCard({
               {needsConfirmation && <p><strong>Needs confirmation:</strong> {(activity.needsConfirmationReasons || ["Cost, timing, or booking details need confirmation."]).join("; ")}</p>}
               <p><strong>Attachments:</strong> {activity.attachmentIds.length ? activity.attachmentIds.join(", ") : "No attachments linked."}</p>
               {activity.imageAlt && <p><strong>Image:</strong> {activity.imageAlt}</p>}
+              {activity.imageCredit && (
+                <p>
+                  <strong>Image credit:</strong>{" "}
+                  {activity.imageCreditUrl ? <a href={activity.imageCreditUrl} target="_blank" rel="noreferrer">{activity.imageCredit}</a> : activity.imageCredit}
+                  {activity.imageLicense ? `, ${activity.imageLicense}` : ""}
+                </p>
+              )}
             </div>
             {trip.id === "japan-2026" && japanCategories.includes(activity.category as Category) && (
               <p className="quiet-note">Japan activity keeps original planner fields where possible, with JPY as source and CAD as comparison.</p>
@@ -1250,6 +1315,8 @@ interface ActivityListProps {
   deleteActivity: (id: string) => void;
   brokenImageIds: Set<string>;
   setBrokenImageIds: (ids: Set<string>) => void;
+  loadedImageIds: Set<string>;
+  setLoadedImageIds: (ids: Set<string>) => void;
   trip: Trip;
   exchangeRate: number;
 }

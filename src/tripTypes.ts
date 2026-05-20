@@ -56,6 +56,10 @@ export interface TripActivity {
   notes: string;
   imageUrl: string;
   imageAlt?: string;
+  imageCredit?: string;
+  imageCreditUrl?: string;
+  imageLicense?: string;
+  imageSearchQuery?: string;
   priority: number;
   isBooked: boolean;
   isCompleted: boolean;
