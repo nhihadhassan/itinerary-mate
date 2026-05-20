@@ -51,7 +51,7 @@ import {
   routeMoves,
   tripAnchors,
 } from "./japanItinerary";
-import { peruRouteSuggestions, peruTrip } from "./peruItinerary";
+import { peruDayRouteSummaries, peruRouteSuggestions, peruTrip } from "./peruItinerary";
 import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
 
 type AppView = "dashboard" | "itinerary" | "places" | "budget" | "logistics" | "maps" | "assistant" | "import";
@@ -250,12 +250,19 @@ function mergeTrip(defaultTrip: Trip, storedTrip?: Trip): Trip {
   const storedBySource = new Map(storedTrip.activities.filter((activity) => activity.sourceId).map((activity) => [activity.sourceId, activity]));
   const storedByTitleDate = new Map(storedTrip.activities.map((activity) => [`${activity.title.toLowerCase()}|${activity.date || ""}`, activity]));
   const defaultIds = new Set(defaultTrip.activities.map((activity) => activity.id));
+  const mergeNotes = (baseNotes: string, storedNotes?: string) => {
+    if (!storedNotes) return baseNotes;
+    if (!baseNotes) return storedNotes;
+    if (storedNotes.includes(baseNotes)) return storedNotes;
+    if (baseNotes.includes(storedNotes)) return baseNotes;
+    return `${baseNotes}\n${storedNotes}`;
+  };
   const editableMerge = (base: TripActivity, stored?: TripActivity): TripActivity => {
     if (!stored) return base;
     const sameCurrency = stored.currency === base.currency;
     return {
       ...base,
-      notes: stored.notes || base.notes,
+      notes: mergeNotes(base.notes, stored.notes),
       isBooked: stored.isBooked ?? base.isBooked,
       isCompleted: stored.isCompleted ?? base.isCompleted,
       bookingReference: stored.bookingReference || base.bookingReference,
@@ -1093,7 +1100,10 @@ function ItineraryTimeline(props: {
       {props.days.map((day) => {
         const dayActivities = props.activities.filter((activity) => activity.day === day);
         const pacing = dayScore(dayActivities);
-        const routeSummary = dayActivities.map((activity) => activity.city).filter(Boolean).filter((city, index, list) => list.indexOf(city) === index).join(" -> ");
+        const routeSummary =
+          props.trip.id === "peru-2026"
+            ? peruDayRouteSummaries[day]
+            : dayActivities.map((activity) => activity.city).filter(Boolean).filter((city, index, list) => list.indexOf(city) === index).join(" -> ");
         return (
           <DayDropZone key={day} day={day}>
             <details className="day-details" open>
@@ -1547,7 +1557,7 @@ function ImportPanel({ trip, replaceActiveTrip }: { trip: Trip; replaceActiveTri
       {isPeru && (
         <div className="source-note">
           <h3>Peru source status</h3>
-          <p>Public Wanderlog state is already imported: 55 dated cards, 4 flights, 10 lodging blocks, 2 train/transit blocks, and 19 CAD expenses. The Google Doc export redirects to sign-in, so its notes need to be pasted here before they can be used.</p>
+          <p>Public Wanderlog state plus the local Wanderlog PDF are imported: 55 dated cards, exact PDF route-leg timings, 16 daily route summaries, 4 flights, 10 lodging blocks, 2 train/transit blocks, and 19 CAD expenses. Add more Google Doc notes here only if the doc changes later.</p>
         </div>
       )}
 

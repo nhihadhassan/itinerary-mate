@@ -3,7 +3,7 @@
 Itinerary Mate is a local-first multi-trip itinerary tracker built with Vite, React, and TypeScript. It currently includes:
 
 - Japan Trip: the original September 1-30, 2026 planner with JPY source budgets and CAD comparison.
-- Peru Trip: a July 11-26, 2026 Wanderlog import with 55 dated cards, 4 flights, 10 lodging blocks, 2 train/transit blocks, 19 imported CAD expenses, and PEN + CAD planning displays.
+- Peru Trip: a July 11-26, 2026 Wanderlog import enriched from the local Wanderlog PDF, with 55 dated cards, exact route-leg timing text, 16 daily route summaries, 4 flights, 10 lodging blocks, 2 train/transit blocks, 19 imported CAD expenses, and PEN + CAD planning displays.
 
 The app is designed as a travel command center: editable cards, budget dashboards, lodging and flight tracking, attachment placeholders, route suggestions, Google Maps export, CSV export, dark mode, and offline-ready PWA basics.
 
@@ -49,12 +49,12 @@ pnpm preview
 
 ## Peru Import Workflow
 
-The Google Doc source currently redirects document export to Google sign-in, so the app treats it as "needs paste/export" until you provide the content. The public Wanderlog state is already imported as the Peru source of truth.
+The Google Doc source previously redirected document export to Google sign-in. The local file `/Users/nhihad/Downloads/Trip to Peru – Wanderlog.pdf` now provides the same detailed Wanderlog/Google Doc trip information and is used for route-leg timings, daily route summaries, opening-hour notes, flights, hotels, transit, and expenses.
 
 You can use the in-app **Import** tab to:
 
 1. Paste Wanderlog text or JSON for preview.
-2. Paste Google Doc notes after exporting or copying them manually.
+2. Paste Google Doc notes after exporting or copying them manually if the doc changes after the PDF.
 3. Export a JSON backup of the active trip.
 4. Restore a JSON backup only after explicit confirmation.
 

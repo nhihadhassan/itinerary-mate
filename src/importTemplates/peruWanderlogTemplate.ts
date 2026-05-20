@@ -7,8 +7,9 @@ Trip:
 - title: Peru Trip
 - startDate: 2026-07-11
 - endDate: 2026-07-26
-- currency: CAD
-- source: Wanderlog or Google Doc
+- localCurrency: PEN
+- comparisonCurrency: CAD
+- source: Wanderlog PDF, Wanderlog, or Google Doc
 
 Day:
 - day: 1
@@ -28,9 +29,13 @@ Activity:
 - endTime:
 - duration:
 - travelTimeFromPrevious:
+- routeLegEstimate:
+- dayRouteSummary:
 - transportMode:
 - estimatedCost:
-- currency: CAD
+- localCurrencyCode: PEN
+- costCad:
+- costStatus: imported | converted-estimate | needs-confirmation | manual
 - bookingReference:
 - notes:
 - imageUrl:
@@ -68,7 +73,7 @@ Attachment metadata, local-only for now:
 Important:
 - Do not paste passport scans, visa scans, or private IDs into localStorage.
 - Live routing, live flight updates, and AI calls are intentionally not connected yet.
-- Google Doc content can be pasted into this format if the doc is not publicly accessible.`;
+- Google Doc content can be pasted into this format if it changes after the Wanderlog PDF.`;
 
 export const peruWanderlogExample = {
   day: 5,
@@ -86,12 +91,14 @@ export const peruWanderlogExample = {
     startTime: "",
     endTime: "",
     duration: "3-4 hr",
-    travelTimeFromPrevious: "Bus from Aguas Calientes",
+    travelTimeFromPrevious: "15 min · 3.7 mi from Hotel INKA'S LAND",
+    routeLegEstimate: "15 min · 3.7 mi from Hotel INKA'S LAND",
     transportMode: "bus + walk",
-    estimatedCost: 132.3,
-    currency: "CAD",
+    estimatedCost: 330.75,
+    localCurrencyCode: "PEN",
+    costCad: 132.3,
     bookingReference: "Paste reference here",
-    notes: "Go early and keep the rest of the day flexible.",
+    notes: "Wanderlog PDF: Open 6:30AM-3:45PM. Go early and keep the rest of the day flexible.",
     attachmentIds: ["peru-machu-ticket"],
   },
 };
