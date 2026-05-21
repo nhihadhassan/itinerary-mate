@@ -18,6 +18,22 @@ const commonsDirectUrls: Record<string, string> = {
   "Pisac archaeological site.jpg":
     "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Pisac_archaeological_site.jpg/1280px-Pisac_archaeological_site.jpg",
   "Awana Kancha - panoramio.jpg": "https://upload.wikimedia.org/wikipedia/commons/1/14/Awana_Kancha_-_panoramio.jpg",
+  "Posvátný incký chrám Qenko - panoramio.jpg":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Posv%C3%A1tn%C3%BD_inck%C3%BD_chr%C3%A1m_Qenko_-_panoramio.jpg/1280px-Posv%C3%A1tn%C3%BD_inck%C3%BD_chr%C3%A1m_Qenko_-_panoramio.jpg",
+  "Templo de San Blas, Cusco, Perú, 2015-07-31, DD 64.JPG":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Templo_de_San_Blas%2C_Cusco%2C_Per%C3%BA%2C_2015-07-31%2C_DD_64.JPG/1280px-Templo_de_San_Blas%2C_Cusco%2C_Per%C3%BA%2C_2015-07-31%2C_DD_64.JPG",
+  "San Pedro Market in Cusco, Peru.jpg":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/San_Pedro_Market_in_Cusco%2C_Peru.jpg/1280px-San_Pedro_Market_in_Cusco%2C_Peru.jpg",
+  "Ausangate.jpg": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Ausangate.jpg/1280px-Ausangate.jpg",
+  "Colca Canyon Puno.jpg": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Colca_Canyon_Puno.jpg/1280px-Colca_Canyon_Puno.jpg",
+  "Paracas National Reserve.jpg":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Paracas_National_Reserve.jpg/1280px-Paracas_National_Reserve.jpg",
+  "Ballestas Islands Pérou 2011.jpg":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Ballestas_Islands_P%C3%A9rou_2011.jpg/1280px-Ballestas_Islands_P%C3%A9rou_2011.jpg",
+  "Huacachina - Ica, Peru.jpg":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Huacachina_-_Ica%2C_Peru.jpg/1280px-Huacachina_-_Ica%2C_Peru.jpg",
+  "Lima, Peru Skyline - 6907521554.jpg":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Lima%2C_Peru_Skyline_-_6907521554.jpg/1280px-Lima%2C_Peru_Skyline_-_6907521554.jpg",
 };
 
 const commonsFile = (fileName: string) =>
@@ -43,6 +59,7 @@ const peruImageCatalog: Record<string, Partial<TripActivity>> = {
   Saqsaywaman: commonsImage("Saqsaywaman, cusco, peru - panoramio.jpg", "Stone terraces at Saqsaywaman near Cusco.", "Saqsaywaman Cusco Peru"),
   "Parque Arqueológico Pisac": commonsImage("Pisac archaeological site.jpg", "Terraces at the Pisac archaeological site.", "Pisac archaeological site Peru"),
   "Awana Kancha": commonsImage("Awana Kancha - panoramio.jpg", "Textile and alpaca stop near Cusco.", "Awana Kancha Peru"),
+  "Q'enco Archaeological Complex": commonsImage("Posvátný incký chrám Qenko - panoramio.jpg", "Rock-cut Inca ruins at Qenko near Cusco.", "Qenko archaeological complex Cusco Peru"),
   "Zona Arqueologica Moray": commonsImage("View of Inca terraces of Moray, 2018.jpg", "Circular terraces at Moray.", "Moray terraces Peru"),
   Maras: commonsImage("Salineras de Maras, Maras, Perú, 2015-07-30, DD 12.JPG", "Salt ponds at Maras.", "Salineras de Maras Peru"),
   "Ollantaytambo Archeological Site": commonsImage("Ollantaytambo terraces.jpg", "Terraces at Ollantaytambo archaeological site.", "Ollantaytambo archaeological site Peru"),
@@ -51,9 +68,18 @@ const peruImageCatalog: Record<string, Partial<TripActivity>> = {
   Ollantaytambo: commonsImage("Ollantaytambo terraces.jpg", "Ollantaytambo town and surrounding mountains.", "Ollantaytambo Peru"),
   Cusco: commonsImage("Vista de Cusco, Perú, 2015-07-31, DD 11-17 PAN.JPG", "Cusco city with mountains in the background.", "Cusco Peru"),
   Vinicunca: commonsImage("Montaña de colores en Cuzco Perú.jpg", "Rainbow Mountain in Peru.", "Vinicunca Rainbow Mountain Peru"),
+  "Plaza San Blas": commonsImage("Templo de San Blas, Cusco, Perú, 2015-07-31, DD 64.JPG", "San Blas church and plaza area in Cusco.", "San Blas Cusco Peru"),
+  "Mercado Central de San Pedro": commonsImage("San Pedro Market in Cusco, Peru.jpg", "Inside San Pedro Market in Cusco.", "San Pedro Market Cusco Peru"),
+  "Ausangate 7 Lagunas": commonsImage("Ausangate.jpg", "Ausangate mountain landscape in Peru.", "Ausangate Peru"),
   Arequipa: commonsImage("Arequipa - Plaza de Armas - panoramio (1).jpg", "Arequipa Plaza de Armas with volcano backdrop.", "Arequipa Peru Plaza de Armas"),
   "Santa Catalina Monastery": commonsImage("Santa Catalina Monastery, Arequipa - 53032077180.jpg", "Colorful corridor inside Santa Catalina Monastery.", "Santa Catalina Monastery Arequipa"),
   "Plaza de Armas Arequipa": commonsImage("Arequipa - Plaza de Armas - panoramio (1).jpg", "Arequipa Plaza de Armas.", "Plaza de Armas Arequipa"),
+  "Mirador Cruz del Cóndor": commonsImage("Colca Canyon Puno.jpg", "Colca Canyon landscape in southern Peru.", "Cruz del Condor Colca Canyon Peru"),
+  Paracas: commonsImage("Paracas National Reserve.jpg", "Coastal desert cliffs at Paracas National Reserve.", "Paracas National Reserve Peru"),
+  "Islas Ballestas": commonsImage("Ballestas Islands Pérou 2011.jpg", "Rocky islands and sea birds at Islas Ballestas.", "Islas Ballestas Peru"),
+  "Huacachina Oasis": commonsImage("Huacachina - Ica, Peru.jpg", "Huacachina oasis surrounded by dunes.", "Huacachina Oasis Peru"),
+  "Huacachina Sandboard": commonsImage("Huacachina - Ica, Peru.jpg", "Huacachina dunes and oasis.", "Huacachina sandboarding Peru"),
+  Lima: commonsImage("Lima, Peru Skyline - 6907521554.jpg", "Lima skyline near the coast.", "Lima Peru skyline"),
 };
 
 export const peruDayRouteSummaries: Record<number, string> = {
