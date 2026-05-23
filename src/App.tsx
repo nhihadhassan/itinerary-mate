@@ -1862,8 +1862,8 @@ function PlaceBrowser(props: ActivityListProps) {
                 </div>
                 <span>{grouped[day].length} places</span>
               </div>
-              <div className="activity-grid browser-grid">
-                {grouped[day].map((activity) => <ActivityCard key={activity.id} activity={activity} {...props} />)}
+              <div className="activity-grid browser-grid preview-grid">
+                {grouped[day].map((activity) => <PlacePreviewCard key={activity.id} activity={activity} {...props} />)}
               </div>
             </section>
           ))}
@@ -1872,6 +1872,54 @@ function PlaceBrowser(props: ActivityListProps) {
         <EmptyState title="No matching places" body="Clear a filter or add a custom activity for this trip." />
       )}
     </section>
+  );
+}
+
+function PlacePreviewCard({
+  activity,
+  expandedId,
+  setExpandedId,
+  brokenImageIds,
+  setBrokenImageIds,
+  loadedImageIds,
+  setLoadedImageIds,
+  exchangeRate,
+}: ActivityListProps & { activity: TripActivity }) {
+  const expanded = expandedId === activity.id;
+  const hasImage = isImageUrl(activity.imageUrl) && !brokenImageIds.has(activity.id);
+  const imageLoaded = loadedImageIds.has(activity.id);
+  const localCostSubtext = getLocalCostSubtext(activity.costLocal ?? activity.estimatedCost, activity.localCurrencyCode || activity.currency);
+  return (
+    <article className={`place-preview-card ${hasImage ? "has-real-image" : "no-real-image"} ${expanded ? "is-expanded" : ""}`}>
+      <button className="place-preview-button" type="button" onClick={() => setExpandedId(expanded ? null : activity.id)} aria-expanded={expanded}>
+        {hasImage && (
+          <div className={`preview-image ${!imageLoaded ? "is-loading" : ""}`}>
+            <span className="image-skeleton" aria-hidden="true" />
+            <img
+              src={activity.imageUrl}
+              alt={activity.imageAlt || activity.title}
+              loading="lazy"
+              decoding="async"
+              className={imageLoaded ? "loaded" : ""}
+              onLoad={() => setLoadedImageIds((current) => new Set(current).add(activity.id))}
+              onError={() => setBrokenImageIds((current) => new Set(current).add(activity.id))}
+            />
+          </div>
+        )}
+        <div className="preview-title">
+          <span>{activity.city} · Day {activity.day}</span>
+          <h3>{activity.title}</h3>
+        </div>
+        <div className="preview-reveal">
+          <p>{activity.description}</p>
+          <div className="meta-chips">
+            <span><CircleDollarSign size={14} /> {getCostLabel(activity, exchangeRate)}</span>
+            <span><MapPin size={14} /> {routeTimeLabel(activity) || "Add travel time"}</span>
+          </div>
+          {localCostSubtext && <small>{localCostSubtext}</small>}
+        </div>
+      </button>
+    </article>
   );
 }
 

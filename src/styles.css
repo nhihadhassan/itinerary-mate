@@ -1226,6 +1226,154 @@ img {
   grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
 }
 
+.preview-grid {
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.place-preview-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-strong);
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgba(43, 54, 49, 0.06);
+}
+
+.place-preview-button {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  text-align: left;
+  overflow: hidden;
+}
+
+.preview-image {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  min-height: 124px;
+  overflow: hidden;
+  background: var(--soft);
+}
+
+.preview-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.015);
+  transition:
+    opacity 220ms ease,
+    transform 520ms ease;
+}
+
+.preview-image img.loaded {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.preview-image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 38%, rgba(14, 24, 21, 0.72));
+  pointer-events: none;
+}
+
+.preview-title {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 11px;
+}
+
+.has-real-image .preview-title {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 2;
+  color: white;
+}
+
+.preview-title span {
+  overflow: hidden;
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 750;
+  opacity: 0.82;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.preview-title h3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+  font-size: 0.98rem;
+  line-height: 1.16;
+}
+
+.no-real-image .place-preview-button {
+  min-height: 76px;
+}
+
+.no-real-image .preview-title {
+  padding: 12px;
+}
+
+.preview-reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  overflow: auto;
+  background: rgba(14, 24, 21, 0.88);
+  color: #fffdf8;
+  opacity: 0;
+  padding: 12px;
+  transition: opacity 180ms ease;
+}
+
+.place-preview-button:hover .preview-reveal,
+.place-preview-button:focus-visible .preview-reveal,
+.place-preview-card.is-expanded .preview-reveal {
+  opacity: 1;
+}
+
+.preview-reveal p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(255, 253, 248, 0.9);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.preview-reveal .meta-chips span {
+  min-height: 26px;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 253, 248, 0.92);
+  padding: 5px 8px;
+  font-size: 0.74rem;
+}
+
+.preview-reveal small {
+  color: rgba(255, 253, 248, 0.72);
+  font-size: 0.74rem;
+}
+
 .card-image {
   position: relative;
   aspect-ratio: 16 / 10;
