@@ -1897,6 +1897,26 @@ img {
   background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%;
 }
 
+.map-tiles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #dce6d9;
+}
+
+.map-tiles img {
+  position: absolute;
+  object-fit: cover;
+}
+
+.map-tiles::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 253, 248, 0.08);
+  pointer-events: none;
+}
+
 :root[data-theme="dark"] .map-canvas {
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
@@ -1909,17 +1929,18 @@ img {
 .map-lines {
   position: absolute;
   inset: 0;
+  z-index: 2;
   inline-size: 100%;
   block-size: 100%;
 }
 
 .map-lines polyline {
   fill: none;
-  stroke: color-mix(in srgb, var(--blue) 72%, white);
-  stroke-width: 1.7;
+  stroke: rgba(42, 98, 150, 0.8);
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 2 1.2;
+  stroke-dasharray: 0;
   vector-effect: non-scaling-stroke;
 }
 
@@ -2320,6 +2341,14 @@ img {
 
 .trip-peru .day-chip {
   min-width: 112px;
+}
+
+.trip-peru .day-rail {
+  position: relative;
+  top: auto;
+  z-index: 2;
+  margin: 0 0 12px;
+  padding-bottom: 6px;
 }
 
 .trip-peru .day-chip em {

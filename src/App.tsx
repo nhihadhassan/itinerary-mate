@@ -413,6 +413,31 @@ function routeTimeLabel(activity: TripActivity) {
   return activity.routeLegEstimate || activity.travelTimeFromPrevious || "";
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function longitudeToTileX(longitude: number, zoom: number) {
+  return ((longitude + 180) / 360) * 2 ** zoom;
+}
+
+function latitudeToTileY(latitude: number, zoom: number) {
+  const latRad = (clamp(latitude, -85.0511, 85.0511) * Math.PI) / 180;
+  return ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * 2 ** zoom;
+}
+
+function getMapZoom(bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) {
+  const latSpan = bounds.maxLat - bounds.minLat;
+  const lngSpan = bounds.maxLng - bounds.minLng;
+  const span = Math.max(latSpan, lngSpan);
+  if (span > 70) return 3;
+  if (span > 35) return 4;
+  if (span > 15) return 5;
+  if (span > 7) return 7;
+  if (span > 2.5) return 9;
+  return 12;
+}
+
 function activityRange(activity: TripActivity): BudgetRange {
   const cost = activity.costLocal ?? activity.estimatedCost;
   return {
@@ -562,6 +587,12 @@ function App() {
     setExpandedId(null);
     setActiveView("itinerary");
   }, [state.activeTripId]);
+
+  useEffect(() => {
+    if (activeTrip.id === "peru-2026" && activeView === "itinerary" && selectedDay === "All") {
+      setSelectedDay(1);
+    }
+  }, [activeTrip.id, activeView, selectedDay]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1069,18 +1100,20 @@ function DayRail({
 }) {
   return (
     <section className="day-rail" aria-label="Day selector">
-      <button
-        type="button"
-        className={selectedDay === "All" ? "day-chip active" : "day-chip"}
-        onClick={() => {
-          setSelectedDay("All");
-          setActiveView("itinerary");
-        }}
-      >
-        <CalendarDays size={17} aria-hidden="true" />
-        <span>All days</span>
-        <small>{activities.length} stops</small>
-      </button>
+      {trip.id !== "peru-2026" && (
+        <button
+          type="button"
+          className={selectedDay === "All" ? "day-chip active" : "day-chip"}
+          onClick={() => {
+            setSelectedDay("All");
+            setActiveView("itinerary");
+          }}
+        >
+          <CalendarDays size={17} aria-hidden="true" />
+          <span>All days</span>
+          <small>{activities.length} stops</small>
+        </button>
+      )}
       {days.map((day) => {
         const dayActivities = activities.filter((activity) => activity.day === day);
         const pacing = dayScore(dayActivities);
@@ -1512,11 +1545,39 @@ function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activitie
     }),
     { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 },
   );
+  const hasCoordinates = coordinateStops.length > 0;
   const hasBounds = coordinateStops.length >= 2 && bounds.maxLat !== bounds.minLat && bounds.maxLng !== bounds.minLng;
+  const zoom = hasCoordinates ? getMapZoom(hasBounds ? bounds : { minLat: coordinateStops[0].latitude!, maxLat: coordinateStops[0].latitude!, minLng: coordinateStops[0].longitude!, maxLng: coordinateStops[0].longitude! }) : 4;
+  const centerLat = hasCoordinates ? (bounds.minLat + bounds.maxLat) / 2 : 0;
+  const centerLng = hasCoordinates ? (bounds.minLng + bounds.maxLng) / 2 : 0;
+  const centerTileX = longitudeToTileX(centerLng, zoom);
+  const centerTileY = latitudeToTileY(centerLat, zoom);
+  const tileColumns = 5;
+  const tileRows = 4;
+  const startTileX = Math.floor(centerTileX - tileColumns / 2);
+  const startTileY = Math.floor(centerTileY - tileRows / 2);
+  const maxTile = 2 ** zoom;
+  const mapTiles = Array.from({ length: tileColumns * tileRows }, (_, index) => {
+    const col = index % tileColumns;
+    const row = Math.floor(index / tileColumns);
+    const tileX = startTileX + col;
+    const tileY = clamp(startTileY + row, 0, maxTile - 1);
+    const wrappedX = ((tileX % maxTile) + maxTile) % maxTile;
+    return {
+      key: `${zoom}-${tileX}-${tileY}`,
+      url: `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
+      left: `${(col / tileColumns) * 100}%`,
+      top: `${(row / tileRows) * 100}%`,
+      width: `${100 / tileColumns}%`,
+      height: `${100 / tileRows}%`,
+    };
+  });
   const pins = stops.map((activity, index) => {
-    const hasCoordinates = hasBounds && activity.latitude !== undefined && activity.longitude !== undefined;
-    const x = hasCoordinates ? 14 + ((activity.longitude! - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 72 : 18 + ((index * 17) % 68);
-    const y = hasCoordinates ? 82 - ((activity.latitude! - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * 64 : 16 + ((index * 23) % 66);
+    const hasPinCoordinates = activity.latitude !== undefined && activity.longitude !== undefined && hasCoordinates;
+    const projectedX = hasPinCoordinates ? longitudeToTileX(activity.longitude!, zoom) : startTileX + 0.7 + ((index * 0.75) % 3.4);
+    const projectedY = hasPinCoordinates ? latitudeToTileY(activity.latitude!, zoom) : startTileY + 0.6 + ((index * 0.8) % 2.5);
+    const x = ((projectedX - startTileX) / tileColumns) * 100;
+    const y = ((projectedY - startTileY) / tileRows) * 100;
     return { activity, index, x: Math.max(8, Math.min(90, x)), y: Math.max(8, Math.min(88, y)), kind: pinKind(activity) };
   });
   const routePoints = pins.map((pin) => `${pin.x},${pin.y}`).join(" ");
@@ -1532,6 +1593,13 @@ function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activitie
         <span>{stops.length} pins</span>
       </div>
       <div className="map-canvas">
+        {hasCoordinates && (
+          <div className="map-tiles" aria-hidden="true">
+            {mapTiles.map((tile) => (
+              <img key={tile.key} src={tile.url} alt="" loading="lazy" style={{ left: tile.left, top: tile.top, width: tile.width, height: tile.height }} />
+            ))}
+          </div>
+        )}
         <svg className="map-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           <polyline points={routePoints} />
         </svg>
@@ -1561,7 +1629,7 @@ function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activitie
           </div>
         ))}
       </div>
-      <p className="quiet-note">This is a route preview using saved coordinates and stop order. Copy / CSV export for Google Maps is in Map / Export; no live routing API is connected yet.</p>
+      <p className="quiet-note">Map tiles from OpenStreetMap. Pins use saved coordinates and stop order; live routing is still not connected.</p>
     </aside>
   );
 }
