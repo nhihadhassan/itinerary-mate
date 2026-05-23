@@ -1531,10 +1531,28 @@ function pinKind(activity: TripActivity) {
   return "attraction";
 }
 
+function isLongDistanceTransitDay(trip: Trip, activities: TripActivity[], selectedDay: number | "All") {
+  if (trip.id !== "peru-2026" || selectedDay === "All") return false;
+  const countries = new Set(activities.map((activity) => activity.country).filter(Boolean));
+  const transitStops = activities.filter((activity) => activity.type === "flight" || activity.type === "transport" || activity.category === "Flight" || activity.category === "Transit");
+  const coordinates = activities.filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined);
+  if (countries.size > 1 || transitStops.length >= 2) return true;
+  if (coordinates.length < 2) return false;
+  const latitudes = coordinates.map((activity) => activity.latitude!);
+  const longitudes = coordinates.map((activity) => activity.longitude!);
+  return Math.max(...latitudes) - Math.min(...latitudes) > 3 || Math.max(...longitudes) - Math.min(...longitudes) > 3;
+}
+
 function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activities: TripActivity[]; selectedDay: number | "All" }) {
   const stops = activities
     .filter((activity) => activity.latitude !== undefined || activity.googleMapsQuery || activity.address)
     .slice(0, 14);
+  const dayLabel = selectedDay === "All" ? "all visible days" : `Day ${selectedDay}`;
+
+  if (isLongDistanceTransitDay(trip, stops, selectedDay)) {
+    return <TransitRoutePanel trip={trip} stops={stops} selectedDay={selectedDay} dayLabel={dayLabel} />;
+  }
+
   const coordinateStops = stops.filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined);
   const bounds = coordinateStops.reduce(
     (acc, activity) => ({
@@ -1581,8 +1599,6 @@ function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activitie
     return { activity, index, x: Math.max(8, Math.min(90, x)), y: Math.max(8, Math.min(88, y)), kind: pinKind(activity) };
   });
   const routePoints = pins.map((pin) => `${pin.x},${pin.y}`).join(" ");
-  const dayLabel = selectedDay === "All" ? "all visible days" : `Day ${selectedDay}`;
-
   return (
     <aside className="map-panel" aria-label={`${trip.title} map preview`}>
       <div className="map-panel-header">
@@ -1630,6 +1646,35 @@ function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activitie
         ))}
       </div>
       <p className="quiet-note">Map tiles from OpenStreetMap. Pins use saved coordinates and stop order; live routing is still not connected.</p>
+    </aside>
+  );
+}
+
+function TransitRoutePanel({ trip, stops, selectedDay, dayLabel }: { trip: Trip; stops: TripActivity[]; selectedDay: number | "All"; dayLabel: string }) {
+  const routeSummary = typeof selectedDay === "number" ? peruDayRouteSummaries[selectedDay] : "";
+  return (
+    <aside className="map-panel transit-panel" aria-label={`${trip.title} transit route`}>
+      <div className="map-panel-header">
+        <div>
+          <p className="eyebrow">Transit day</p>
+          <h2>{dayLabel}</h2>
+        </div>
+        <span>{stops.length} stops</span>
+      </div>
+      {routeSummary && <p className="transit-summary">{routeSummary}</p>}
+      <div className="transit-route-list">
+        {stops.map((activity, index) => (
+          <article key={activity.id} className={`transit-step step-${pinKind(activity)}`}>
+            <span className="transit-number">{index + 1}</span>
+            <div>
+              <strong>{activity.title}</strong>
+              <small>{activity.city}{activity.country ? `, ${activity.country}` : ""}</small>
+              <p>{index === 0 ? "Start of day" : routeTimeLabel(activity) || "Travel time TBD"}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="quiet-note">This day crosses countries or regions, so a street map would be misleading. Local sightseeing days still show the map.</p>
     </aside>
   );
 }

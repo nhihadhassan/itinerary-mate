@@ -2035,6 +2035,76 @@ img {
   font-size: 0.82rem;
 }
 
+.transit-panel {
+  align-content: start;
+}
+
+.transit-summary {
+  border: 1px solid color-mix(in srgb, var(--blue) 18%, var(--line));
+  border-radius: var(--radius);
+  background: var(--blue-soft);
+  color: var(--ink);
+  padding: 10px 12px;
+  font-size: 0.92rem;
+}
+
+.transit-route-list {
+  display: grid;
+  gap: 10px;
+}
+
+.transit-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  padding: 12px;
+}
+
+.transit-step strong {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.transit-step small,
+.transit-step p {
+  color: var(--muted);
+}
+
+.transit-step p {
+  margin-top: 4px;
+  font-size: 0.88rem;
+}
+
+.transit-number {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--blue);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.step-hotel .transit-number {
+  background: #7357c7;
+}
+
+.step-food .transit-number {
+  background: #d44d3f;
+}
+
+.step-attraction .transit-number {
+  background: #df4763;
+}
+
 .timeline.content-section {
   padding: 0;
   border: 0;
