@@ -55,7 +55,7 @@ import {
 import { peruDayRouteSummaries, peruRouteSuggestions, peruTrip } from "./peruItinerary";
 import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
 
-type AppView = "dashboard" | "itinerary" | "places" | "budget" | "logistics" | "maps" | "more";
+type AppView = "dashboard" | "itinerary" | "places" | "budget" | "maps" | "more";
 type ThemePreference = "system" | "light" | "dark";
 
 declare global {
@@ -99,7 +99,6 @@ const navItems: Array<{ id: AppView; label: string }> = [
   { id: "itinerary", label: "Itinerary" },
   { id: "places", label: "Explore" },
   { id: "budget", label: "Budget" },
-  { id: "logistics", label: "Logistics" },
   { id: "maps", label: "Map / Export" },
   { id: "more", label: "More" },
 ];
@@ -1025,10 +1024,6 @@ function App() {
             <BudgetDashboard trip={activeTrip} activities={allVisibleActivities} budget={budget} updateActivity={updateActivity} exchangeRate={activeExchangeRate} />
           )}
 
-          {activeView === "logistics" && (
-            <LogisticsPanel trip={activeTrip} updateHotel={updateHotel} routeSuggestions={routeSuggestions} exchangeRate={activeExchangeRate} />
-          )}
-
           {activeView === "maps" && (
             <MapsExport
               trip={activeTrip}
@@ -1279,6 +1274,11 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
           <MetricCard label="Booked" value={String(booked)} detail={`${incomplete} incomplete`} icon={<BadgeCheck size={18} />} />
           <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
         </div>
+        <div className="peru-overview-feature-grid">
+          <PeruDestinationMap activities={activities} />
+          <PeruImageSlideshow activities={activities} />
+        </div>
+        <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
       </section>
     );
   }
@@ -1321,6 +1321,193 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
       )}
 
       <SuggestionList suggestions={routeSuggestions.slice(0, 4)} />
+      <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
+    </section>
+  );
+}
+
+function PeruDestinationMap({ activities }: { activities: TripActivity[] }) {
+  const peruvianStops = activities
+    .filter((activity) =>
+      activity.country === "Peru" &&
+      activity.latitude !== undefined &&
+      activity.longitude !== undefined &&
+      activity.type !== "flight" &&
+      activity.type !== "transport" &&
+      activity.category !== "Flight" &&
+      activity.category !== "Transit"
+    )
+    .filter((activity, index, list) => list.findIndex((item) => item.title === activity.title && item.city === activity.city) === index)
+    .slice(0, 24);
+
+  if (!peruvianStops.length) {
+    return <EmptyState title="No Peru map pins yet" body="Peru destinations with saved coordinates will appear here." />;
+  }
+
+  const bounds = peruvianStops.reduce(
+    (acc, activity) => ({
+      minLat: Math.min(acc.minLat, activity.latitude!),
+      maxLat: Math.max(acc.maxLat, activity.latitude!),
+      minLng: Math.min(acc.minLng, activity.longitude!),
+      maxLng: Math.max(acc.maxLng, activity.longitude!),
+    }),
+    { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 },
+  );
+  const zoom = getMapZoom(bounds);
+  const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+  const centerLng = (bounds.minLng + bounds.maxLng) / 2;
+  const centerTileX = longitudeToTileX(centerLng, zoom);
+  const centerTileY = latitudeToTileY(centerLat, zoom);
+  const tileColumns = 5;
+  const tileRows = 4;
+  const startTileX = Math.floor(centerTileX - tileColumns / 2);
+  const startTileY = Math.floor(centerTileY - tileRows / 2);
+  const maxTile = 2 ** zoom;
+  const mapTiles = Array.from({ length: tileColumns * tileRows }, (_, index) => {
+    const col = index % tileColumns;
+    const row = Math.floor(index / tileColumns);
+    const tileX = startTileX + col;
+    const tileY = clamp(startTileY + row, 0, maxTile - 1);
+    const wrappedX = ((tileX % maxTile) + maxTile) % maxTile;
+    return {
+      key: `${zoom}-${tileX}-${tileY}`,
+      url: `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
+      left: `${(col / tileColumns) * 100}%`,
+      top: `${(row / tileRows) * 100}%`,
+      width: `${100 / tileColumns}%`,
+      height: `${100 / tileRows}%`,
+    };
+  });
+  const pins = peruvianStops.map((activity, index) => {
+    const projectedX = longitudeToTileX(activity.longitude!, zoom);
+    const projectedY = latitudeToTileY(activity.latitude!, zoom);
+    return {
+      activity,
+      index,
+      x: Math.max(7, Math.min(93, ((projectedX - startTileX) / tileColumns) * 100)),
+      y: Math.max(7, Math.min(91, ((projectedY - startTileY) / tileRows) * 100)),
+      kind: pinKind(activity),
+    };
+  });
+
+  return (
+    <article className="overview-map-card">
+      <div className="map-panel-header">
+        <div>
+          <p className="eyebrow">Peru map</p>
+          <h2>Destinations in Peru</h2>
+        </div>
+        <span>{peruvianStops.length} pins</span>
+      </div>
+      <div className="map-canvas overview-map-canvas">
+        <div className="map-tiles" aria-hidden="true">
+          {mapTiles.map((tile) => (
+            <img key={tile.key} src={tile.url} alt="" loading="lazy" style={{ left: tile.left, top: tile.top, width: tile.width, height: tile.height }} />
+          ))}
+        </div>
+        {pins.map((pin) => (
+          <button
+            key={pin.activity.id}
+            type="button"
+            className={`map-pin pin-${pin.kind}`}
+            style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+            title={pin.activity.title}
+          >
+            {pin.index + 1}
+          </button>
+        ))}
+      </div>
+      <p className="quiet-note">Only Peru stops are shown here. Canada, Mexico, and flight connection points are intentionally excluded.</p>
+    </article>
+  );
+}
+
+function PeruImageSlideshow({ activities }: { activities: TripActivity[] }) {
+  const slides = useMemo(
+    () =>
+      activities
+        .filter((activity) => activity.country === "Peru" && isImageUrl(activity.imageUrl) && activity.type !== "flight" && activity.category !== "Flight")
+        .filter((activity, index, list) => list.findIndex((item) => item.title === activity.title) === index)
+        .slice(0, 10),
+    [activities],
+  );
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const timer = window.setInterval(() => setSlideIndex((index) => (index + 1) % slides.length), 4200);
+    return () => window.clearInterval(timer);
+  }, [slides.length]);
+
+  if (!slides.length) {
+    return <EmptyState title="No destination photos yet" body="Real Peru place images will appear here when available." />;
+  }
+
+  const active = slides[slideIndex % slides.length];
+  return (
+    <article className="overview-slideshow-card">
+      <img src={active.imageUrl} alt={active.imageAlt || active.title} loading="lazy" decoding="async" />
+      <div className="slideshow-caption">
+        <p className="eyebrow">Look forward to</p>
+        <h2>{active.title}</h2>
+        <span>{active.city}</span>
+      </div>
+      <div className="slideshow-dots" aria-label="Slideshow position">
+        {slides.map((slide, index) => (
+          <button key={slide.id} type="button" className={index === slideIndex ? "active" : ""} onClick={() => setSlideIndex(index)} aria-label={`Show ${slide.title}`} />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function OverviewLogistics({ trip, routeSuggestions, exchangeRate }: { trip: Trip; routeSuggestions: RouteSuggestion[]; exchangeRate: number }) {
+  const transferSuggestions = routeSuggestions.filter((suggestion) => suggestion.severity === "warning").slice(0, 3);
+  const transferActivities = trip.activities.filter((activity) => activity.type === "transport" || activity.type === "flight" || activity.category === "Transit" || activity.category === "Flight").slice(0, 4);
+  return (
+    <section className="overview-logistics">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Logistics</p>
+          <h2>Flights, stays, transfers</h2>
+        </div>
+        <Plane size={20} aria-hidden="true" />
+      </div>
+      <div className="overview-logistics-grid">
+        <div>
+          <h3>Flights</h3>
+          {trip.flights.length ? trip.flights.slice(0, 3).map((flight) => <FlightCard key={flight.id} flight={flight} exchangeRate={exchangeRate} tripCurrency={trip.currency} />) : <EmptyState title="No flights yet" body="Flight records can be added later." />}
+        </div>
+        <div>
+          <h3>Hotels / stays</h3>
+          {trip.hotels.length ? trip.hotels.slice(0, 4).map((hotel) => (
+            <article className="overview-mini-card" key={hotel.id}>
+              <strong>{hotel.name}</strong>
+              <span>{hotel.city} · {hotel.checkIn || "Check-in TBD"}</span>
+            </article>
+          )) : <EmptyState title="No hotels yet" body="Stays will appear here." />}
+        </div>
+        <div>
+          <h3>Transfers</h3>
+          {(transferActivities.length ? transferActivities : []).map((activity) => (
+            <article className="overview-mini-card" key={activity.id}>
+              <strong>{activity.title}</strong>
+              <span>{routeTimeLabel(activity) || activity.duration || "Timing not set"}</span>
+            </article>
+          ))}
+          {!transferActivities.length && transferSuggestions.length ? transferSuggestions.map((suggestion) => (
+            <article className="overview-mini-card" key={suggestion.id}>
+              <strong>{suggestion.title}</strong>
+              <span>{suggestion.detail}</span>
+            </article>
+          )) : null}
+          {!transferActivities.length && !transferSuggestions.length && <EmptyState title="No transfers yet" body="Route notes will appear here." />}
+        </div>
+        <div>
+          <h3>Attachments</h3>
+          {trip.attachments.length ? trip.attachments.slice(0, 3).map((attachment) => <AttachmentCard key={attachment.id} attachment={attachment} />) : <EmptyState title="No attachments yet" body="Tickets and confirmations can be linked later." />}
+        </div>
+      </div>
     </section>
   );
 }
