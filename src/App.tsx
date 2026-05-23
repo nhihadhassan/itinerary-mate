@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   DndContext,
@@ -58,6 +58,12 @@ import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory,
 type AppView = "dashboard" | "itinerary" | "places" | "budget" | "logistics" | "maps" | "more";
 type ThemePreference = "system" | "light" | "dark";
 
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
+
 interface LegacyJapanState {
   version: 1;
   activities: Activity[];
@@ -85,6 +91,8 @@ interface BudgetRange {
 
 const MULTI_STORAGE_KEY = "itinerary-mate-v2";
 const LEGACY_JAPAN_STORAGE_KEY = "september-japan-planner-v1";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+let googleMapsLoader: Promise<any> | null = null;
 const tripOrder: TripId[] = ["japan-2026", "peru-2026"];
 const navItems: Array<{ id: AppView; label: string }> = [
   { id: "dashboard", label: "Overview" },
@@ -436,6 +444,28 @@ function getMapZoom(bounds: { minLat: number; maxLat: number; minLng: number; ma
   if (span > 7) return 7;
   if (span > 2.5) return 9;
   return 12;
+}
+
+function loadGoogleMaps(apiKey: string) {
+  if (window.google?.maps) return Promise.resolve(window.google);
+  if (googleMapsLoader) return googleMapsLoader;
+  googleMapsLoader = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-google-maps="true"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.google));
+      existing.addEventListener("error", reject);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleMaps = "true";
+    script.onload = () => resolve(window.google);
+    script.onerror = () => reject(new Error("Google Maps failed to load."));
+    document.head.appendChild(script);
+  });
+  return googleMapsLoader;
 }
 
 function activityRange(activity: TripActivity): BudgetRange {
@@ -1554,6 +1584,10 @@ function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activitie
   }
 
   const coordinateStops = stops.filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined);
+  if (GOOGLE_MAPS_API_KEY && coordinateStops.length) {
+    return <GoogleRouteMapPanel stops={stops} coordinateStops={coordinateStops} dayLabel={dayLabel} />;
+  }
+
   const bounds = coordinateStops.reduce(
     (acc, activity) => ({
       minLat: Math.min(acc.minLat, activity.latitude ?? acc.minLat),
@@ -1646,6 +1680,115 @@ function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activitie
         ))}
       </div>
       <p className="quiet-note">Map tiles from OpenStreetMap. Pins use saved coordinates and stop order; live routing is still not connected.</p>
+    </aside>
+  );
+}
+
+function GoogleRouteMapPanel({ stops, coordinateStops, dayLabel }: { stops: TripActivity[]; coordinateStops: TripActivity[]; dayLabel: string }) {
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const [mapStatus, setMapStatus] = useState("Loading Google map...");
+
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY || !mapRef.current) return;
+    const apiKey = GOOGLE_MAPS_API_KEY;
+    let cancelled = false;
+    async function renderMap() {
+      try {
+        const google = await loadGoogleMaps(apiKey);
+        if (cancelled || !mapRef.current) return;
+        await google.maps.importLibrary?.("maps");
+        await google.maps.importLibrary?.("routes");
+        const first = coordinateStops[0];
+        const map = new google.maps.Map(mapRef.current, {
+          center: { lat: first.latitude, lng: first.longitude },
+          zoom: 13,
+          clickableIcons: false,
+          fullscreenControl: false,
+          mapTypeControl: false,
+          streetViewControl: false,
+        });
+        const bounds = new google.maps.LatLngBounds();
+        coordinateStops.forEach((activity, index) => {
+          const position = { lat: activity.latitude, lng: activity.longitude };
+          bounds.extend(position);
+          new google.maps.Marker({
+            map,
+            position,
+            label: String(index + 1),
+            title: activity.title,
+          });
+        });
+        map.fitBounds(bounds, 36);
+
+        const routeStops = coordinateStops.filter((activity) => activity.type !== "flight" && activity.category !== "Flight");
+        if (routeStops.length >= 2 && routeStops.length <= 25) {
+          const sameCity = new Set(routeStops.map((activity) => activity.city)).size === 1;
+          const directionsService = new google.maps.DirectionsService();
+          const directionsRenderer = new google.maps.DirectionsRenderer({
+            map,
+            suppressMarkers: true,
+            preserveViewport: false,
+            polylineOptions: {
+              strokeColor: "#2f76c3",
+              strokeOpacity: 0.85,
+              strokeWeight: 5,
+            },
+          });
+          directionsService.route(
+            {
+              origin: { lat: routeStops[0].latitude, lng: routeStops[0].longitude },
+              destination: { lat: routeStops[routeStops.length - 1].latitude, lng: routeStops[routeStops.length - 1].longitude },
+              waypoints: routeStops.slice(1, -1).map((activity) => ({
+                location: { lat: activity.latitude, lng: activity.longitude },
+                stopover: true,
+              })),
+              travelMode: sameCity ? google.maps.TravelMode.WALKING : google.maps.TravelMode.DRIVING,
+              optimizeWaypoints: false,
+            },
+            (result: any, status: string) => {
+              if (cancelled) return;
+              if (status === "OK" && result) {
+                directionsRenderer.setDirections(result);
+                setMapStatus(`Google ${sameCity ? "walking" : "driving"} route`);
+              } else {
+                setMapStatus("Google map with saved pins; route unavailable");
+              }
+            },
+          );
+        } else {
+          setMapStatus("Google map with saved pins");
+        }
+      } catch {
+        if (!cancelled) setMapStatus("Google Maps could not load");
+      }
+    }
+    renderMap();
+    return () => {
+      cancelled = true;
+    };
+  }, [coordinateStops]);
+
+  return (
+    <aside className="map-panel" aria-label={`${dayLabel} Google map`}>
+      <div className="map-panel-header">
+        <div>
+          <p className="eyebrow">Google map</p>
+          <h2>{dayLabel}</h2>
+        </div>
+        <span>{coordinateStops.length} pins</span>
+      </div>
+      <div className="google-map-canvas" ref={mapRef}>
+        <span>{mapStatus}</span>
+      </div>
+      <div className="map-route-list">
+        {stops.slice(0, 6).map((activity, index) => (
+          <div key={activity.id}>
+            <strong>{index + 1}. {activity.title}</strong>
+            <span>{activity.city} · {routeTimeLabel(activity) || "travel time TBD"}</span>
+          </div>
+        ))}
+      </div>
+      <p className="quiet-note">{mapStatus}. Transit/flight days still use the route summary because map directions are not useful for airport hops.</p>
     </aside>
   );
 }
