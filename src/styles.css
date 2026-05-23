@@ -2504,3 +2504,249 @@ img {
     grid-row: 1;
   }
 }
+
+/* Focused cleanup pass: quieter controls, consistent trip cards, stable sticky bars. */
+.nav-tabs {
+  top: 0;
+}
+
+.day-rail,
+.trip-peru .day-rail {
+  position: sticky;
+  top: 64px;
+  z-index: 38;
+  margin: 0 0 10px;
+  padding: 4px 2px 8px;
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.filter-bar,
+.trip-peru .peru-filter-bar {
+  top: 144px;
+  z-index: 36;
+  grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.2fr);
+  align-items: center;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(43, 54, 49, 0.08);
+}
+
+.timeline.content-section {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.itinerary-card.no-real-image,
+.browser-grid .place-card.no-real-image {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.itinerary-card.no-real-image .card-image {
+  display: none;
+}
+
+.browser-grid .place-card.no-real-image .card-image {
+  min-height: 76px;
+  aspect-ratio: auto;
+  border-radius: 9px;
+}
+
+.browser-grid .place-card.no-real-image .fallback-visual-content {
+  min-block-size: 76px;
+  align-content: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.browser-grid .place-card.no-real-image .fallback-visual-content span,
+.browser-grid .place-card.no-real-image .fallback-visual-content small {
+  display: none;
+}
+
+.browser-grid .place-card.no-real-image .fallback-visual-content strong {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.itinerary-card.no-real-image .card-body {
+  padding: 2px;
+}
+
+.itinerary-card.no-real-image .meta-chips span:nth-child(n + 4) {
+  display: none;
+}
+
+.cost-chip {
+  align-items: flex-start;
+}
+
+.cost-chip b {
+  font-weight: 750;
+}
+
+.cost-chip small,
+.budget-row strong small,
+.metric-card strong + span:empty {
+  color: var(--muted);
+}
+
+.cost-chip small {
+  display: block;
+  margin-left: 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.budget-hero-simple {
+  grid-template-columns: minmax(240px, 1.25fr) repeat(2, minmax(160px, 0.8fr));
+}
+
+.total-metric strong {
+  font-size: clamp(1.8rem, 4vw, 2.65rem);
+  line-height: 1;
+}
+
+.budget-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.budget-row strong {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  font-size: 0.98rem;
+  text-align: right;
+}
+
+.budget-row strong small {
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.budget-edit-row {
+  grid-template-columns: minmax(0, 1fr) 116px 104px;
+}
+
+.budget-edit-row > small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+.logistics-stack {
+  gap: 18px;
+}
+
+.logistics-grid-compact {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.compact-logistics-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.compact-logistics-card summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  min-height: 72px;
+  cursor: pointer;
+  list-style: none;
+  padding: 14px;
+}
+
+.compact-logistics-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.compact-logistics-card summary span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.compact-logistics-card summary strong {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.compact-logistics-card summary small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.compact-details {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding: 14px;
+}
+
+.transfer-card {
+  box-shadow: none;
+}
+
+.transfer-card p {
+  font-size: 0.9rem;
+}
+
+@media (min-width: 900px) {
+  .timeline .place-card.itinerary-card {
+    grid-template-columns: 140px minmax(0, 1fr);
+    align-items: stretch;
+    gap: 12px;
+    padding: 10px;
+  }
+
+  .timeline .place-card.itinerary-card.no-real-image {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .timeline .place-card.itinerary-card .card-image {
+    min-block-size: 118px;
+    aspect-ratio: 1 / 1;
+    border-radius: 9px;
+  }
+}
+
+@media (max-width: 760px) {
+  .nav-tabs {
+    top: 86px;
+  }
+
+  .day-rail,
+  .trip-peru .day-rail {
+    top: 144px;
+    margin-bottom: 8px;
+  }
+
+  .filter-bar,
+  .trip-peru .peru-filter-bar {
+    position: sticky;
+    top: 220px;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px;
+  }
+
+  .chip-row {
+    gap: 6px;
+  }
+
+  .budget-hero-simple,
+  .budget-edit-row,
+  .compact-logistics-card summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .compact-logistics-card summary strong,
+  .budget-row strong {
+    justify-items: start;
+    text-align: left;
+  }
+}

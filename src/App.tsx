@@ -388,11 +388,17 @@ function formatMoney(value: number, currency: string, localPerCad = DEFAULT_CAD_
 }
 
 function formatCadOnly(value: number, localPerCad: number) {
-  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Math.round(value / localPerCad));
+  return `${new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Math.round(value / localPerCad))} CAD`;
 }
 
 function formatLocalOnly(value: number, currency: string) {
   return new Intl.NumberFormat(currency === "PEN" ? "es-PE" : "ja-JP", { style: "currency", currency, maximumFractionDigits: 0 }).format(Math.round(value));
+}
+
+function formatLocalApprox(value: number, currency: string) {
+  if (!value) return "";
+  const prefix = currency === "JPY" ? "approx. " : currency === "PEN" ? "approx. " : "";
+  return `${prefix}${formatLocalOnly(value, currency)}`;
 }
 
 function getExchangeRate(trip: Trip, japanCadToJpy: number) {
@@ -405,20 +411,33 @@ function getCurrencyLabel(trip: Trip) {
 
 function getCostLabel(activity: TripActivity, exchangeRate: number) {
   const cost = activity.costLocal ?? activity.estimatedCost;
-  if (!cost && activity.costStatus === "needs-confirmation") return "Cost needs confirmation";
-  return `${formatMoney(cost, activity.localCurrencyCode || activity.currency, exchangeRate)}${activity.costCategory ? ` | ${activity.costCategory}` : ""}`;
+  if (!cost) return "Add cost";
+  const currency = activity.localCurrencyCode || activity.currency;
+  return `${formatCadOnly(cost, exchangeRate)}${activity.costCategory ? ` | ${activity.costCategory}` : ""}`;
+}
+
+function getLocalCostSubtext(value: number, currency: string) {
+  if (!value || currency === "CAD") return "";
+  return formatLocalApprox(value, currency);
 }
 
 function activityStatusLabel(activity: TripActivity) {
   if (activity.isCompleted) return "Done";
   if (activity.isBooked || activity.bookingStatus === "booked") return "Booked";
-  if (activity.needsConfirmationReasons?.length || activity.costStatus === "needs-confirmation" || activity.bookingStatus === "needs-confirmation") return "Needs confirmation";
   if (activity.bookingStatus === "optional") return "Optional";
   return "Not booked";
 }
 
 function routeTimeLabel(activity: TripActivity) {
   return activity.routeLegEstimate || activity.travelTimeFromPrevious || "";
+}
+
+function cleanUiText(text = "") {
+  return text
+    .replace(/Wanderlog PDF:\\s*/gi, "")
+    .replace(/Cost needs confirmation/gi, "Cost not set")
+    .replace(/Timing needs confirmation/gi, "Timing not set")
+    .trim();
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -580,6 +599,21 @@ function App() {
     });
   }, [allVisibleActivities, query, selectedCategory, selectedCity, selectedDay]);
 
+  const placeBrowserActivities = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allVisibleActivities.filter((activity) => {
+      const categoryMatch = selectedCategory === "All" || activity.category === selectedCategory;
+      const cityMatch = selectedCity === "All" || activity.city === selectedCity;
+      const queryMatch =
+        !q ||
+        [activity.title, activity.city, activity.country, activity.description, activity.notes, activity.address]
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
+      return categoryMatch && cityMatch && queryMatch;
+    });
+  }, [allVisibleActivities, query, selectedCategory, selectedCity]);
+
   const timelineDays = useMemo(() => (selectedDay === "All" ? days : days.includes(selectedDay) ? [selectedDay] : [days[0] || 1]), [days, selectedDay]);
   const selectedDayActivities = useMemo(
     () => (selectedDay === "All" ? filteredActivities : filteredActivities.filter((activity) => activity.day === selectedDay)),
@@ -617,12 +651,6 @@ function App() {
     setExpandedId(null);
     setActiveView("itinerary");
   }, [state.activeTripId]);
-
-  useEffect(() => {
-    if (activeTrip.id === "peru-2026" && activeView === "itinerary" && selectedDay === "All") {
-      setSelectedDay(1);
-    }
-  }, [activeTrip.id, activeView, selectedDay]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -877,7 +905,6 @@ function App() {
           activities={allVisibleActivities}
           selectedDay={selectedDay}
           setSelectedDay={setSelectedDay}
-          setActiveView={setActiveView}
           trip={activeTrip}
           exchangeRate={activeExchangeRate}
         />
@@ -905,21 +932,14 @@ function App() {
 
           <section className="card quick-card">
             <p className="eyebrow">Rough total</p>
-            {activeTrip.id === "peru-2026" ? (
-              <>
-                <strong>{formatCadOnly(budget.total.mid, activeExchangeRate)}</strong>
-                <span>{formatLocalOnly(budget.total.mid, activeTrip.currency)}</span>
-              </>
-            ) : (
-              <>
-                <strong>{formatMoney(budget.total.mid, activeTrip.currency, activeExchangeRate)}</strong>
-                <span>Low {formatMoney(budget.total.low, activeTrip.currency, activeExchangeRate)}. High {formatMoney(budget.total.high, activeTrip.currency, activeExchangeRate)}.</span>
-                <label className="field compact-field">
-                  <span>Planning rate</span>
-                  <input type="number" min="0.01" step="0.01" value={activeExchangeRate} onChange={(event) => setActiveExchangeRate(Math.max(0.01, Number(event.target.value)))} />
-                  <small>{getCurrencyLabel(activeTrip)}, rough planning only</small>
-                </label>
-              </>
+            <strong>{formatCadOnly(budget.total.mid, activeExchangeRate)}</strong>
+            <span>{formatLocalOnly(budget.total.mid, activeTrip.currency)}</span>
+            {activeTrip.id === "japan-2026" && (
+              <label className="field compact-field">
+                <span>Planning rate</span>
+                <input type="number" min="0.01" step="0.01" value={activeExchangeRate} onChange={(event) => setActiveExchangeRate(Math.max(0.01, Number(event.target.value)))} />
+                <small>{getCurrencyLabel(activeTrip)}, rough planning only</small>
+              </label>
             )}
           </section>
 
@@ -987,7 +1007,7 @@ function App() {
 
           {activeView === "places" && (
             <PlaceBrowser
-              activities={filteredActivities}
+              activities={placeBrowserActivities}
               expandedId={expandedId}
               setExpandedId={setExpandedId}
               updateActivity={updateActivity}
@@ -1116,7 +1136,6 @@ function DayRail({
   activities,
   selectedDay,
   setSelectedDay,
-  setActiveView,
   trip,
   exchangeRate,
 }: {
@@ -1124,26 +1143,20 @@ function DayRail({
   activities: TripActivity[];
   selectedDay: number | "All";
   setSelectedDay: (day: number | "All") => void;
-  setActiveView: (view: AppView) => void;
   trip: Trip;
   exchangeRate: number;
 }) {
   return (
     <section className="day-rail" aria-label="Day selector">
-      {trip.id !== "peru-2026" && (
-        <button
-          type="button"
-          className={selectedDay === "All" ? "day-chip active" : "day-chip"}
-          onClick={() => {
-            setSelectedDay("All");
-            setActiveView("itinerary");
-          }}
-        >
-          <CalendarDays size={17} aria-hidden="true" />
-          <span>All days</span>
-          <small>{activities.length} stops</small>
-        </button>
-      )}
+      <button
+        type="button"
+        className={selectedDay === "All" ? "day-chip active" : "day-chip"}
+        onClick={() => setSelectedDay("All")}
+      >
+        <CalendarDays size={17} aria-hidden="true" />
+        <span>All days</span>
+        <small>{activities.length} stops</small>
+      </button>
       {days.map((day) => {
         const dayActivities = activities.filter((activity) => activity.day === day);
         const pacing = dayScore(dayActivities);
@@ -1154,10 +1167,7 @@ function DayRail({
             key={day}
             type="button"
             className={selectedDay === day ? "day-chip active" : "day-chip"}
-            onClick={() => {
-              setSelectedDay(day);
-              setActiveView("itinerary");
-            }}
+            onClick={() => setSelectedDay(day)}
           >
             <span>Day {day}</span>
             <small>{first?.date ? formatDate(first.date) : first?.city || trip.country}</small>
@@ -1283,7 +1293,7 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
       </div>
       <div className="dashboard-grid">
         <MetricCard label="Days" value={String(totalDays)} detail={`${formatDate(trip.startDate)} to ${formatDate(trip.endDate)}`} icon={<CalendarDays size={18} />} />
-        <MetricCard label="Rough estimate" value={formatMoney(budget.total.mid, trip.currency, exchangeRate)} detail="Editable, local-first budget" icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="Rough estimate" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={getLocalCostSubtext(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
         <MetricCard label="Booked items" value={String(booked)} detail="Includes manual flight records" icon={<BadgeCheck size={18} />} />
         <MetricCard label="Incomplete" value={String(incomplete)} detail="Activities still open" icon={<CheckCircle2 size={18} />} />
         <MetricCard label="Next flight" value={nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : "Add flight"} detail={nextFlight ? `${nextFlight.departureAirport} to ${nextFlight.arrivalAirport}` : "Manual tracker ready"} icon={<Plane size={18} />} />
@@ -1440,6 +1450,7 @@ function ActivityCard({
   const hasImage = isImageUrl(activity.imageUrl) && !brokenImageIds.has(activity.id);
   const imageLoaded = loadedImageIds.has(activity.id);
   const needsConfirmation = Boolean(activity.needsConfirmationReasons?.length || activity.costStatus === "needs-confirmation" || activity.bookingStatus === "needs-confirmation");
+  const localCostSubtext = getLocalCostSubtext(activity.costLocal ?? activity.estimatedCost, activity.localCurrencyCode || activity.currency);
   return (
     <article className={`place-card ${variant === "compact" ? "itinerary-card" : ""} ${hasImage ? "has-real-image" : "no-real-image"} type-${activity.type || "activity"}${activity.isCompleted ? " completed" : ""}`} ref={setNodeRef} style={style}>
       {stopNumber && <span className="pin-badge" aria-label={`Stop ${stopNumber}`}>{stopNumber}</span>}
@@ -1487,12 +1498,14 @@ function ActivityCard({
         <p>{activity.description}</p>
         {activity.address && <p className="address-line"><MapPin size={14} aria-hidden="true" /> {activity.address}</p>}
         <div className="meta-chips">
-          <span><CircleDollarSign size={14} /> {getCostLabel(activity, exchangeRate)}</span>
+          <span className="cost-chip">
+            <CircleDollarSign size={14} />
+            <b>{getCostLabel(activity, exchangeRate)}</b>
+            {localCostSubtext && <small>{localCostSubtext}</small>}
+          </span>
           <span><MapPin size={14} /> {routeTimeLabel(activity) || "Add travel time"}</span>
           <span><BadgeCheck size={14} /> {activityStatusLabel(activity)}</span>
           {variant === "full" && <span><Sparkles size={14} /> Priority {activity.priority}</span>}
-          {needsConfirmation && <span className="needs-confirmation"><TriangleAlert size={14} /> Needs confirmation</span>}
-          {activity.source && <span>{activity.source}</span>}
         </div>
         {expanded && (
           <div className="expanded-panel">
@@ -1562,7 +1575,7 @@ function pinKind(activity: TripActivity) {
 }
 
 function isLongDistanceTransitDay(trip: Trip, activities: TripActivity[], selectedDay: number | "All") {
-  if (trip.id !== "peru-2026" || selectedDay === "All") return false;
+  if (trip.id !== "peru-2026") return false;
   const countries = new Set(activities.map((activity) => activity.country).filter(Boolean));
   const transitStops = activities.filter((activity) => activity.type === "flight" || activity.type === "transport" || activity.category === "Flight" || activity.category === "Transit");
   const coordinates = activities.filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined);
@@ -1817,7 +1830,7 @@ function TransitRoutePanel({ trip, stops, selectedDay, dayLabel }: { trip: Trip;
           </article>
         ))}
       </div>
-      <p className="quiet-note">This day crosses countries or regions, so a street map would be misleading. Local sightseeing days still show the map.</p>
+      <p className="quiet-note">{selectedDay === "All" ? "The full trip crosses countries and regions, so this summary is safer than drawing one misleading street route." : "This day crosses countries or regions, so a street map would be misleading. Local sightseeing days still show the map."}</p>
     </aside>
   );
 }
@@ -1864,13 +1877,23 @@ function PlaceBrowser(props: ActivityListProps) {
 
 function BudgetDashboard({ trip, activities, budget, updateActivity, exchangeRate }: { trip: Trip; activities: TripActivity[]; budget: ReturnType<typeof makeBudget>; updateActivity: (id: string, patch: Partial<TripActivity>) => void; exchangeRate: number }) {
   const categoryRows = Object.entries(budget.categories);
+  const dayRows = activities.reduce<Record<string, BudgetRange>>((acc, activity) => {
+    const key = `Day ${activity.day}`;
+    acc[key] = sumRanges([acc[key] || { low: 0, mid: 0, high: 0 }, activityRange(activity)]);
+    return acc;
+  }, {});
   const [budgetQuery, setBudgetQuery] = useState("");
-  const [budgetView, setBudgetView] = useState<"all" | "missing" | "day" | "city">("all");
+  const [budgetView, setBudgetView] = useState<"all" | "missing" | "flight" | "hotel" | "activity" | "food" | "transport" | "day" | "city">("all");
   const normalizedQuery = budgetQuery.trim().toLowerCase();
   const budgetActivities = activities.filter((activity) => {
     const queryMatch = !normalizedQuery || [activity.title, activity.city, activity.category, activity.notes].join(" ").toLowerCase().includes(normalizedQuery);
-    const missingMatch = budgetView !== "missing" || activity.costStatus === "needs-confirmation" || !activity.costLocal;
-    return queryMatch && missingMatch;
+    const missingMatch = budgetView !== "missing" || !activity.costLocal;
+    const categoryMatch =
+      !["flight", "hotel", "activity", "food", "transport"].includes(budgetView) ||
+      activity.costCategory === budgetView ||
+      activity.type === budgetView ||
+      (budgetView === "transport" && (activity.category === "Transit" || activity.category === "Flight"));
+    return queryMatch && missingMatch && categoryMatch;
   });
   const groupedBudget = budgetActivities.reduce<Record<string, TripActivity[]>>((acc, activity) => {
     const key = budgetView === "day" ? `Day ${activity.day}` : budgetView === "city" ? activity.city : "Editable costs";
@@ -1882,15 +1905,19 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, exchangeRat
     <section className="content-section">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Rough estimates</p>
-          <h2>Budget dashboard</h2>
+          <p className="eyebrow">CAD-first rough estimates</p>
+          <h2>Budget</h2>
         </div>
         <CircleDollarSign size={22} aria-hidden="true" />
       </div>
-      <div className="budget-hero">
-        <MetricCard label="Low" value={formatMoney(budget.total.low, trip.currency, exchangeRate)} detail="Lean planning estimate" icon={<CircleDollarSign size={18} />} />
-        <MetricCard label="Mid" value={formatMoney(budget.total.mid, trip.currency, exchangeRate)} detail="Main working estimate" icon={<CircleDollarSign size={18} />} />
-        <MetricCard label="High" value={formatMoney(budget.total.high, trip.currency, exchangeRate)} detail="Comfort buffer estimate" icon={<CircleDollarSign size={18} />} />
+      <div className="budget-hero budget-hero-simple">
+        <article className="metric-card total-metric">
+          <p className="eyebrow">Total estimate</p>
+          <strong>{formatCadOnly(budget.total.mid, exchangeRate)}</strong>
+          <span>{getLocalCostSubtext(budget.total.mid, trip.currency)}</span>
+        </article>
+        <MetricCard label="Low" value={formatCadOnly(budget.total.low, exchangeRate)} detail={getLocalCostSubtext(budget.total.low, trip.currency)} icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="High" value={formatCadOnly(budget.total.high, exchangeRate)} detail={getLocalCostSubtext(budget.total.high, trip.currency)} icon={<CircleDollarSign size={18} />} />
       </div>
       <div className="budget-columns">
         <section>
@@ -1898,23 +1925,22 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, exchangeRat
           {categoryRows.map(([category, range]) => (
             <div className="budget-row" key={category}>
               <span>{category}</span>
-              <strong>{formatMoney(range.mid, trip.currency, exchangeRate)}</strong>
+              <strong>{formatCadOnly(range.mid, exchangeRate)}<small>{getLocalCostSubtext(range.mid, trip.currency)}</small></strong>
             </div>
           ))}
         </section>
         <section>
-          <h3>By city</h3>
-          {Object.entries(budget.byCity).map(([city, range]) => (
-            <div className="budget-row" key={city}>
-              <span>{city}</span>
-              <strong>{formatMoney(range.mid, trip.currency, exchangeRate)}</strong>
+          <h3>By day</h3>
+          {Object.entries(dayRows).slice(0, 12).map(([day, range]) => (
+            <div className="budget-row" key={day}>
+              <span>{day}</span>
+              <strong>{formatCadOnly(range.mid, exchangeRate)}<small>{getLocalCostSubtext(range.mid, trip.currency)}</small></strong>
             </div>
           ))}
         </section>
       </div>
       <section className="inline-editor">
         <h3>Quick cost edits</h3>
-        <p className="quiet-note">Edits use {trip.currency} as the source currency and recalculate the CAD comparison from the current rough planning rate.</p>
         <div className="budget-controls">
           <label className="search-field">
             <Search size={17} aria-hidden="true" />
@@ -1922,7 +1948,12 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, exchangeRat
           </label>
           <select value={budgetView} onChange={(event) => setBudgetView(event.target.value as typeof budgetView)}>
             <option value="all">All editable costs</option>
-            <option value="missing">Needs confirmation</option>
+            <option value="missing">Missing costs</option>
+            <option value="flight">Flights</option>
+            <option value="hotel">Hotels</option>
+            <option value="activity">Activities</option>
+            <option value="food">Food</option>
+            <option value="transport">Transport</option>
             <option value="day">Group by day</option>
             <option value="city">Group by city</option>
           </select>
@@ -1931,92 +1962,142 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, exchangeRat
           <div className="budget-edit-group" key={group}>
             <div className="places-day-heading">
               <h4>{group}</h4>
-              <span>{groupActivities.length} items</span>
+              <span>{groupActivities.length} items{groupActivities.length > 18 ? ", showing first 18" : ""}</span>
             </div>
-            {groupActivities.map((activity) => (
+            {groupActivities.slice(0, 18).map((activity) => {
+              const localCost = activity.costLocal ?? activity.estimatedCost;
+              const cadCost = Math.round(localCost / exchangeRate);
+              return (
               <label className="budget-edit-row" key={activity.id}>
-                <span>{activity.title}<small>{activity.city} · {activity.costStatus || "rough estimate"}</small></span>
-                <input type="number" min="0" value={activity.costLocal ?? activity.estimatedCost} onChange={(event) => updateActivity(activity.id, { estimatedCost: Number(event.target.value) })} />
-                <small>{activity.localCurrencyCode || activity.currency}</small>
+                <span>{activity.title}<small>{activity.city} · {activity.costCategory || activity.type || "activity"}</small></span>
+                <input
+                  type="number"
+                  min="0"
+                  aria-label={`${activity.title} CAD estimate`}
+                  value={cadCost}
+                  onChange={(event) => updateActivity(activity.id, { estimatedCost: Math.round(Number(event.target.value) * exchangeRate) })}
+                />
+                <small>CAD<br />{getLocalCostSubtext(localCost, activity.localCurrencyCode || activity.currency)}</small>
               </label>
-            ))}
+              );
+            })}
           </div>
-        )) : <EmptyState title="No costs match" body="Clear the budget search or switch from needs-confirmation to all costs." />}
+        )) : <EmptyState title="No costs match" body="Clear the budget search or switch from missing costs to all costs." />}
       </section>
     </section>
   );
 }
 
 function LogisticsPanel({ trip, updateHotel, routeSuggestions, exchangeRate }: { trip: Trip; updateHotel: (id: string, patch: Partial<TripHotel>) => void; routeSuggestions: RouteSuggestion[]; exchangeRate: number }) {
+  const transferSuggestions = routeSuggestions.filter((suggestion) => suggestion.severity === "warning").slice(0, 5);
+  const transferActivities = trip.activities.filter((activity) => activity.type === "transport" || activity.type === "flight" || activity.category === "Transit" || activity.category === "Flight").slice(0, 8);
   return (
     <section className="content-section logistics-stack">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Flights, lodging, files</p>
+          <p className="eyebrow">Travel basics</p>
           <h2>Logistics</h2>
         </div>
         <Plane size={22} aria-hidden="true" />
       </div>
       <div className="logistics-grid">
         <section>
-          <h3>Manual flight tracker</h3>
+          <h3>Flights</h3>
           {trip.flights.length ? trip.flights.map((flight) => <FlightCard key={flight.id} flight={flight} exchangeRate={exchangeRate} tripCurrency={trip.currency} />) : <EmptyState title="No flights yet" body="Add manual flight records when booked." />}
         </section>
         <section>
-          <h3>Lodging</h3>
+          <h3>Hotels / stays</h3>
           {trip.hotels.length ? trip.hotels.map((hotel) => (
-            <article className="logistics-card" key={hotel.id}>
-              <p className="eyebrow">{hotel.city}</p>
-              <label className="field"><span>Stay</span><input value={hotel.name} onChange={(event) => updateHotel(hotel.id, { name: event.target.value })} /></label>
-              <label className="field"><span>Rough cost ({hotel.localCurrencyCode || hotel.currency})</span><input type="number" value={hotel.costLocal ?? hotel.estimatedCost} onChange={(event) => updateHotel(hotel.id, { estimatedCost: Number(event.target.value) })} /></label>
-              <div className="mini-tags">
-                <span>{formatMoney(hotel.costLocal ?? hotel.estimatedCost, hotel.localCurrencyCode || hotel.currency, exchangeRate)}</span>
-                <span>{hotel.costStatus || "rough estimate"}</span>
+            <details className="logistics-card compact-logistics-card" key={hotel.id}>
+              <summary>
+                <div>
+                  <p className="eyebrow">{hotel.city}</p>
+                  <h3>{hotel.name}</h3>
+                  <span>{hotel.checkIn || "Check-in TBD"} to {hotel.checkOut || "Check-out TBD"}</span>
+                </div>
+                <strong>{formatCadOnly(hotel.costLocal ?? hotel.estimatedCost, exchangeRate)}<small>{getLocalCostSubtext(hotel.costLocal ?? hotel.estimatedCost, hotel.localCurrencyCode || hotel.currency)}</small></strong>
+              </summary>
+              <div className="compact-details">
+                <label className="field"><span>Stay</span><input value={hotel.name} onChange={(event) => updateHotel(hotel.id, { name: event.target.value })} /></label>
+                <label className="field">
+                  <span>Cost in CAD</span>
+                  <input
+                    type="number"
+                    value={Math.round((hotel.costLocal ?? hotel.estimatedCost) / exchangeRate)}
+                    onChange={(event) => updateHotel(hotel.id, { estimatedCost: Math.round(Number(event.target.value) * exchangeRate) })}
+                  />
+                </label>
+                {hotel.address && <p>{hotel.address}</p>}
+                <p>{cleanUiText(hotel.notes) || "No hotel notes yet."}</p>
               </div>
-              <p>{hotel.notes || "No hotel notes yet."}</p>
-            </article>
+            </details>
           )) : <EmptyState title="No hotels yet" body="Lodging cards are ready when you add stays." />}
         </section>
       </div>
       <section>
-        <h3>Attachments</h3>
-        <div className="attachment-grid">
-          {trip.attachments.map((attachment) => <AttachmentCard key={attachment.id} attachment={attachment} />)}
+        <h3>Transfers</h3>
+        <div className="logistics-grid logistics-grid-compact">
+          {transferActivities.length ? transferActivities.map((activity) => (
+            <article className="logistics-card transfer-card" key={activity.id}>
+              <p className="eyebrow">Day {activity.day} · {activity.city}</p>
+              <h3>{activity.title}</h3>
+              <p>{cleanUiText(routeTimeLabel(activity) || activity.duration) || "Timing not set"}</p>
+            </article>
+          )) : transferSuggestions.length ? transferSuggestions.map((suggestion) => (
+            <article className="logistics-card transfer-card" key={suggestion.id}>
+              <p className="eyebrow">{suggestion.day ? `Day ${suggestion.day}` : suggestion.city || "Route"}</p>
+              <h3>{suggestion.title}</h3>
+              <p>{suggestion.detail}</p>
+            </article>
+          )) : <EmptyState title="No transfers added" body="Flights and city transfers will appear here." />}
         </div>
       </section>
-      <SuggestionList suggestions={routeSuggestions} />
-      <div className="api-note">
-        <h3>Future routing API interface</h3>
-        <p>Route suggestions are simple heuristics for now: city grouping, crowded-day warnings, and backtracking checks. Google Maps or Mapbox can plug in later with API keys outside the client bundle.</p>
-      </div>
+      <section>
+        <h3>Attachments</h3>
+        {trip.attachments.length ? (
+          <div className="attachment-grid">
+            {trip.attachments.map((attachment) => <AttachmentCard key={attachment.id} attachment={attachment} />)}
+          </div>
+        ) : <EmptyState title="No attachments yet" body="Tickets, confirmations, and PDFs can be linked later." />}
+      </section>
     </section>
   );
 }
 
 function FlightCard({ flight, exchangeRate, tripCurrency }: { flight: TripFlight; exchangeRate: number; tripCurrency: string }) {
+  const localCost = flight.costLocal ?? Math.round((flight.costCad || 0) * exchangeRate);
   return (
-    <article className="logistics-card">
-      <p className="eyebrow">Manual status, not live</p>
-      <h3>{flight.airline} {flight.flightNumber}</h3>
-      <p>{flight.departureAirport} to {flight.arrivalAirport}</p>
-      <div className="mini-tags">
-        <span>{formatDate(flight.departureTime.slice(0, 10))}</span>
-        <span>{flight.status}</span>
-        {(flight.costLocal || flight.costCad) && <span>{formatMoney(flight.costLocal ?? Math.round((flight.costCad || 0) * exchangeRate), flight.localCurrencyCode || tripCurrency, exchangeRate)}</span>}
+    <details className="logistics-card compact-logistics-card">
+      <summary>
+        <div>
+          <p className="eyebrow">{formatDate(flight.departureTime.slice(0, 10))}</p>
+          <h3>{flight.airline} {flight.flightNumber}</h3>
+          <span>{flight.departureAirport} to {flight.arrivalAirport}</span>
+        </div>
+        {(flight.costLocal || flight.costCad) && <strong>{formatCadOnly(localCost, exchangeRate)}<small>{getLocalCostSubtext(localCost, flight.localCurrencyCode || tripCurrency)}</small></strong>}
+      </summary>
+      <div className="compact-details">
+        <p>{flight.departureTime} to {flight.arrivalTime}</p>
+        {flight.confirmation && <p>Confirmation: {flight.confirmation}</p>}
+        {flight.notes && <p>{cleanUiText(flight.notes)}</p>}
       </div>
-      <p>{flight.notes}</p>
-    </article>
+    </details>
   );
 }
 
 function AttachmentCard({ attachment }: { attachment: TripAttachment }) {
+  const displayName = attachment.fileName
+    .replace(/Trip to Peru . Wanderlog\.pdf/i, "Wanderlog trip details")
+    .replace(/Trip to Peru – Wanderlog\.pdf/i, "Wanderlog trip details")
+    .replace(/google-doc-source-needs-export\.md/i, "Google Doc notes");
+  const note = cleanUiText(attachment.note).replace(/local Wanderlog PDF/gi, "saved Wanderlog export").replace(/PDF/gi, "file");
   return (
     <article className="attachment-card">
       <FileText size={18} aria-hidden="true" />
       <div>
-        <h3>{attachment.fileName}</h3>
-        <p>{attachment.note}</p>
-        <span>{attachment.type}{attachment.isSensitivePlaceholder ? " | local-only placeholder" : ""}</span>
+        <h3>{displayName}</h3>
+        <p>{note}</p>
+        <span>{attachment.isSensitivePlaceholder ? "local-only placeholder" : "linked reference"}</span>
       </div>
     </article>
   );
@@ -2072,7 +2153,7 @@ function MapsExport({ trip, activities, allActivities, copyRows, downloadCsv, ex
             <article className="maps-row" key={`${row.day}-${row.place}`}>
               <strong>{row.place}</strong>
               <span>{row.address || row.query}</span>
-              <small>Day {row.day} | {row.category} | {formatMoney(row.estimatedCost, row.currency, exchangeRate)} | {row.travelTime || "travel time TBD"}{row.costStatus ? ` | ${row.costStatus}` : ""}</small>
+              <small>Day {row.day} | {row.category} | {formatCadOnly(Number(row.estimatedCost), exchangeRate)}{getLocalCostSubtext(Number(row.estimatedCost), row.currency) ? ` (${getLocalCostSubtext(Number(row.estimatedCost), row.currency)})` : ""} | {row.travelTime || "travel time TBD"}</small>
             </article>
           ))}
         </div>
