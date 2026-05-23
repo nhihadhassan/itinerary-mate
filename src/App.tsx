@@ -379,6 +379,14 @@ function formatMoney(value: number, currency: string, localPerCad = DEFAULT_CAD_
   return new Intl.NumberFormat("en-CA", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
 }
 
+function formatCadOnly(value: number, localPerCad: number) {
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Math.round(value / localPerCad));
+}
+
+function formatLocalOnly(value: number, currency: string) {
+  return new Intl.NumberFormat(currency === "PEN" ? "es-PE" : "ja-JP", { style: "currency", currency, maximumFractionDigits: 0 }).format(Math.round(value));
+}
+
 function getExchangeRate(trip: Trip, japanCadToJpy: number) {
   return trip.currencyConfig?.localPerCad || (trip.currency === "JPY" ? japanCadToJpy : 1);
 }
@@ -777,7 +785,7 @@ function App() {
         <div className="brand-block">
           <p className="eyebrow">Local-first travel command center</p>
           <h1>Itinerary Mate</h1>
-          <p>{activeTrip.description}</p>
+          {activeTrip.id !== "peru-2026" && <p>{activeTrip.description}</p>}
         </div>
         <div className="topbar-actions">
           <TripSwitcher activeTripId={state.activeTripId} setActiveTripId={(activeTripId) => updateState({ activeTripId })} />
@@ -802,69 +810,83 @@ function App() {
         ))}
       </nav>
 
-      <DayRail
-        days={days}
-        activities={allVisibleActivities}
-        selectedDay={selectedDay}
-        setSelectedDay={setSelectedDay}
-        setActiveView={setActiveView}
-        trip={activeTrip}
-        exchangeRate={activeExchangeRate}
-      />
+      {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && (
+        <DayRail
+          days={days}
+          activities={allVisibleActivities}
+          selectedDay={selectedDay}
+          setSelectedDay={setSelectedDay}
+          setActiveView={setActiveView}
+          trip={activeTrip}
+          exchangeRate={activeExchangeRate}
+        />
+      )}
 
       <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""}`}>
         <aside className="side-panel">
-          <section className="card route-card">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">{formatDate(activeTrip.startDate)} to {formatDate(activeTrip.endDate)}</p>
-                <h2>{activeTrip.title}</h2>
+          {activeTrip.id === "japan-2026" && (
+            <section className="card route-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{formatDate(activeTrip.startDate)} to {formatDate(activeTrip.endDate)}</p>
+                  <h2>{activeTrip.title}</h2>
+                </div>
+                <MapIcon size={20} aria-hidden="true" />
               </div>
-              <MapIcon size={20} aria-hidden="true" />
-            </div>
-            <div className="route-strip" aria-label="Trip route">
-              {Array.from(new Set(allVisibleActivities.map((activity) => activity.city))).slice(0, 8).map((city) => (
-                <span key={city}>{city}</span>
-              ))}
-            </div>
-            {activeTrip.id === "japan-2026" && (
+              <div className="route-strip" aria-label="Trip route">
+                {Array.from(new Set(allVisibleActivities.map((activity) => activity.city))).slice(0, 8).map((city) => (
+                  <span key={city}>{city}</span>
+                ))}
+              </div>
               <BranchToggle branch={state.japanBranch} setBranch={(japanBranch) => updateState({ japanBranch })} cadToJpy={state.japanCadToJpy} />
-            )}
-          </section>
+            </section>
+          )}
 
           <section className="card quick-card">
             <p className="eyebrow">Rough total</p>
-            <strong>{formatMoney(budget.total.mid, activeTrip.currency, activeExchangeRate)}</strong>
-            <span>Low {formatMoney(budget.total.low, activeTrip.currency, activeExchangeRate)}. High {formatMoney(budget.total.high, activeTrip.currency, activeExchangeRate)}.</span>
-            <label className="field compact-field">
-              <span>Planning rate</span>
-              <input type="number" min="0.01" step="0.01" value={activeExchangeRate} onChange={(event) => setActiveExchangeRate(Math.max(0.01, Number(event.target.value)))} />
-              <small>{getCurrencyLabel(activeTrip)}, rough planning only</small>
-            </label>
+            {activeTrip.id === "peru-2026" ? (
+              <>
+                <strong>{formatCadOnly(budget.total.mid, activeExchangeRate)}</strong>
+                <span>{formatLocalOnly(budget.total.mid, activeTrip.currency)}</span>
+              </>
+            ) : (
+              <>
+                <strong>{formatMoney(budget.total.mid, activeTrip.currency, activeExchangeRate)}</strong>
+                <span>Low {formatMoney(budget.total.low, activeTrip.currency, activeExchangeRate)}. High {formatMoney(budget.total.high, activeTrip.currency, activeExchangeRate)}.</span>
+                <label className="field compact-field">
+                  <span>Planning rate</span>
+                  <input type="number" min="0.01" step="0.01" value={activeExchangeRate} onChange={(event) => setActiveExchangeRate(Math.max(0.01, Number(event.target.value)))} />
+                  <small>{getCurrencyLabel(activeTrip)}, rough planning only</small>
+                </label>
+              </>
+            )}
           </section>
 
-          <section className="card quick-card">
+          {activeTrip.id === "japan-2026" && <section className="card quick-card">
             <p className="eyebrow">Offline</p>
             <strong>Installable PWA</strong>
             <span>Core app and saved edits work offline. External images and live data may not.</span>
-          </section>
+          </section>}
         </aside>
 
         <div className="content-stack">
-          <FilterBar
-            query={query}
-            setQuery={setQuery}
-            selectedCategory={selectedCategory}
-            setSelectedCategory={setSelectedCategory}
-            selectedCity={selectedCity}
-            setSelectedCity={setSelectedCity}
-            selectedDay={selectedDay}
-            setSelectedDay={setSelectedDay}
-            cities={cities}
-            days={dayOptions}
-            addActivity={addActivity}
-            addRestDay={addRestDay}
-          />
+          {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && (
+            <FilterBar
+              query={query}
+              setQuery={setQuery}
+              selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
+              selectedCity={selectedCity}
+              setSelectedCity={setSelectedCity}
+              selectedDay={selectedDay}
+              setSelectedDay={setSelectedDay}
+              cities={cities}
+              days={dayOptions}
+              addActivity={addActivity}
+              addRestDay={addRestDay}
+              tripId={activeTrip.id}
+            />
+          )}
 
           {activeView === "dashboard" && (
             <Dashboard
@@ -1076,7 +1098,7 @@ function DayRail({
           >
             <span>Day {day}</span>
             <small>{first?.date ? formatDate(first.date) : first?.city || trip.country}</small>
-            <em>{dayActivities.length} stops · {formatMoney(total, trip.currency, exchangeRate)}</em>
+            <em>{trip.id === "peru-2026" ? `${dayActivities.length} stops` : `${dayActivities.length} stops · ${formatMoney(total, trip.currency, exchangeRate)}`}</em>
             <i className={`pacing-dot ${pacing.tone}`} aria-label={pacing.label} />
           </button>
         );
@@ -1124,9 +1146,11 @@ function FilterBar(props: {
   days: Array<number | "All">;
   addActivity: () => void;
   addRestDay: () => void;
+  tripId: TripId;
 }) {
+  const isPeru = props.tripId === "peru-2026";
   return (
-    <section className="filter-bar" aria-label="Trip filters">
+    <section className={`filter-bar ${isPeru ? "peru-filter-bar" : ""}`} aria-label="Trip filters">
       <label className="search-field">
         <Search size={18} aria-hidden="true" />
         <input value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="Search places, notes, addresses" />
@@ -1138,7 +1162,7 @@ function FilterBar(props: {
           </button>
         ))}
       </div>
-      <div className="filter-selects">
+      {!isPeru && <div className="filter-selects">
         <label className="field">
           <span>City</span>
           <select value={props.selectedCity} onChange={(event) => props.setSelectedCity(event.target.value)}>
@@ -1153,7 +1177,7 @@ function FilterBar(props: {
         </label>
         <button className="primary-button" type="button" onClick={props.addActivity}><Plus size={17} aria-hidden="true" /> Add</button>
         <button className="ghost-button" type="button" onClick={props.addRestDay}><CalendarDays size={17} aria-hidden="true" /> Rest day</button>
-      </div>
+      </div>}
     </section>
   );
 }
@@ -1164,6 +1188,27 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
   const nextFlight = trip.flights.find((flight) => new Date(flight.departureTime).getTime() >= Date.now()) || trip.flights[0];
   const nextHotel = trip.hotels[0];
   const totalDays = Math.max(...activities.map((activity) => activity.day), 1);
+  if (trip.id === "peru-2026") {
+    return (
+      <section className="content-section peru-overview">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{formatDate(trip.startDate)} to {formatDate(trip.endDate)}</p>
+            <h2>Peru Trip</h2>
+          </div>
+          <button className="ghost-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(2)")?.click()}>
+            Open itinerary
+          </button>
+        </div>
+        <div className="dashboard-grid peru-dashboard-grid">
+          <MetricCard label="Total" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={formatLocalOnly(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
+          <MetricCard label="Days" value={String(totalDays)} detail={`${activities.length} stops`} icon={<CalendarDays size={18} />} />
+          <MetricCard label="Booked" value={String(booked)} detail={`${incomplete} incomplete`} icon={<BadgeCheck size={18} />} />
+          <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="content-section">
       <div className="section-heading">
@@ -1333,7 +1378,7 @@ function ActivityCard({
   const imageLoaded = loadedImageIds.has(activity.id);
   const needsConfirmation = Boolean(activity.needsConfirmationReasons?.length || activity.costStatus === "needs-confirmation" || activity.bookingStatus === "needs-confirmation");
   return (
-    <article className={`place-card ${variant === "compact" ? "itinerary-card" : ""} type-${activity.type || "activity"}${activity.isCompleted ? " completed" : ""}`} ref={setNodeRef} style={style}>
+    <article className={`place-card ${variant === "compact" ? "itinerary-card" : ""} ${hasImage ? "has-real-image" : "no-real-image"} type-${activity.type || "activity"}${activity.isCompleted ? " completed" : ""}`} ref={setNodeRef} style={style}>
       {stopNumber && <span className="pin-badge" aria-label={`Stop ${stopNumber}`}>{stopNumber}</span>}
       <div className={`card-image ${hasImage ? "has-photo" : "fallback-visual"} ${hasImage && !imageLoaded ? "is-loading" : ""}`} style={{ background: hasImage ? undefined : activity.imageUrl || placeholderFor(activity.title) }}>
         {hasImage ? (

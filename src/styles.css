@@ -2298,3 +2298,81 @@ img {
     font-size: 2rem;
   }
 }
+
+/* Peru simplification pass: keep the imported trip useful, but far quieter. */
+.trip-peru .quick-card {
+  gap: 4px;
+}
+
+.trip-peru .quick-card strong {
+  font-size: clamp(1.8rem, 4vw, 2.45rem);
+  letter-spacing: 0;
+}
+
+.trip-peru .quick-card span {
+  font-size: 0.95rem;
+}
+
+.trip-peru .peru-filter-bar {
+  grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+}
+
+.trip-peru .day-chip {
+  min-width: 112px;
+}
+
+.trip-peru .day-chip em {
+  display: none;
+}
+
+.peru-overview {
+  padding: 18px;
+}
+
+.peru-dashboard-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.peru-dashboard-grid .metric-card {
+  min-height: 126px;
+  box-shadow: none;
+}
+
+.peru-dashboard-grid .metric-card strong {
+  font-size: 1.35rem;
+}
+
+.trip-peru .itinerary-card.no-real-image,
+.trip-peru .browser-grid .place-card.no-real-image {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.trip-peru .itinerary-card.no-real-image .card-image,
+.trip-peru .browser-grid .place-card.no-real-image .card-image {
+  display: none;
+}
+
+.trip-peru .itinerary-card.no-real-image .card-body,
+.trip-peru .browser-grid .place-card.no-real-image .card-body {
+  padding: 2px;
+}
+
+.trip-peru .itinerary-card.no-real-image .meta-chips span:nth-child(n + 4) {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .trip-peru .peru-filter-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trip-peru .itinerary-card.no-real-image {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trip-peru .itinerary-card.no-real-image .card-body {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
