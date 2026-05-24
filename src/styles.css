@@ -3046,3 +3046,224 @@ img {
     min-height: 260px;
   }
 }
+
+/* Dark mode readability pass */
+:root[data-theme="dark"] {
+  --ink: #f4f8f2;
+  --muted: #c3d0c8;
+  --soft: #16231f;
+  --surface: #0d1513;
+  --surface-strong: #17221f;
+  --line: #3f524a;
+  --line-strong: #5d7268;
+  --green: #b9e4c8;
+  --green-2: #21382f;
+  --trip-accent: #b9e4c8;
+  --trip-accent-2: #22362f;
+  --trip-warm: #e2c378;
+  --red: #ffb49d;
+  --red-soft: #3d2018;
+  --amber: #f2d27f;
+  --amber-soft: #3a2d15;
+  --blue: #b5dcec;
+  --blue-soft: #1d3745;
+}
+
+:root[data-theme="dark"] body {
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(54, 101, 82, 0.36), transparent 34rem),
+    linear-gradient(180deg, #0a1210 0%, #101a17 100%);
+}
+
+:root[data-theme="dark"] p,
+:root[data-theme="dark"] small,
+:root[data-theme="dark"] .day-chip small,
+:root[data-theme="dark"] .day-chip em,
+:root[data-theme="dark"] .overview-mini-card span,
+:root[data-theme="dark"] .compact-logistics-card summary span,
+:root[data-theme="dark"] .budget-edit-row > small,
+:root[data-theme="dark"] .maps-row span,
+:root[data-theme="dark"] .maps-row small,
+:root[data-theme="dark"] .address-line {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .eyebrow,
+:root[data-theme="dark"] .select-field span,
+:root[data-theme="dark"] .field span {
+  color: #a9d7ba;
+}
+
+:root[data-theme="dark"] .trip-switcher,
+:root[data-theme="dark"] .nav-tabs,
+:root[data-theme="dark"] .filter-bar,
+:root[data-theme="dark"] .day-rail {
+  background: rgba(13, 21, 19, 0.92);
+  border-color: var(--line);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+}
+
+:root[data-theme="dark"] .trip-switcher button,
+:root[data-theme="dark"] .nav-tabs button,
+:root[data-theme="dark"] .chip,
+:root[data-theme="dark"] .ghost-button,
+:root[data-theme="dark"] .toggle,
+:root[data-theme="dark"] .branch-toggle button,
+:root[data-theme="dark"] .day-chip {
+  border-color: var(--line);
+  background: #14211d;
+  color: #dbe7df;
+}
+
+:root[data-theme="dark"] .trip-switcher button.active,
+:root[data-theme="dark"] .nav-tabs button.active,
+:root[data-theme="dark"] .chip.active,
+:root[data-theme="dark"] .day-chip.active,
+:root[data-theme="dark"] .branch-toggle button.active {
+  border-color: #dbe8d6;
+  background: #edf5ea;
+  color: #10201a;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26);
+}
+
+:root[data-theme="dark"] .day-chip.active small,
+:root[data-theme="dark"] .day-chip.active em {
+  color: #42554d;
+}
+
+:root[data-theme="dark"] .ghost-button:hover,
+:root[data-theme="dark"] .chip:hover,
+:root[data-theme="dark"] .day-chip:hover,
+:root[data-theme="dark"] .trip-switcher button:hover,
+:root[data-theme="dark"] .nav-tabs button:hover {
+  border-color: var(--line-strong);
+  background: #1b2a25;
+  color: #f6faf5;
+}
+
+:root[data-theme="dark"] .trip-switcher button.active:hover,
+:root[data-theme="dark"] .nav-tabs button.active:hover,
+:root[data-theme="dark"] .chip.active:hover,
+:root[data-theme="dark"] .day-chip.active:hover {
+  background: #f4f8f1;
+  color: #10201a;
+}
+
+:root[data-theme="dark"] .save-pill {
+  border-color: rgba(226, 195, 120, 0.5);
+  background: rgba(226, 195, 120, 0.14);
+  color: #f0d996;
+}
+
+:root[data-theme="dark"] .content-section,
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .hero-panel,
+:root[data-theme="dark"] .day-column,
+:root[data-theme="dark"] .day-card,
+:root[data-theme="dark"] .place-card,
+:root[data-theme="dark"] .map-panel,
+:root[data-theme="dark"] .overview-map-card,
+:root[data-theme="dark"] .overview-slideshow-card,
+:root[data-theme="dark"] .overview-logistics,
+:root[data-theme="dark"] .overview-mini-card,
+:root[data-theme="dark"] .metric-card,
+:root[data-theme="dark"] .anchor-card,
+:root[data-theme="dark"] .logistics-card,
+:root[data-theme="dark"] .compact-logistics-card,
+:root[data-theme="dark"] .attachment-card,
+:root[data-theme="dark"] .maps-row,
+:root[data-theme="dark"] .empty-state,
+:root[data-theme="dark"] .api-note,
+:root[data-theme="dark"] .inline-editor,
+:root[data-theme="dark"] .budget-columns > section {
+  border-color: var(--line);
+  background: #17231f;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="dark"] .place-card.type-flight,
+:root[data-theme="dark"] .place-card.type-transport {
+  background: #172833;
+}
+
+:root[data-theme="dark"] .place-card.type-hotel {
+  background: #1d2738;
+}
+
+:root[data-theme="dark"] .place-card.type-food {
+  background: #2a2418;
+}
+
+:root[data-theme="dark"] .day-summary {
+  background: linear-gradient(180deg, #24352e, #17231f);
+}
+
+:root[data-theme="dark"] .search-field,
+:root[data-theme="dark"] .select-field select,
+:root[data-theme="dark"] .field input,
+:root[data-theme="dark"] .field select,
+:root[data-theme="dark"] .field textarea {
+  border-color: var(--line);
+  background: #0f1a17;
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .search-field input::placeholder,
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #90a39a;
+}
+
+:root[data-theme="dark"] .meta-chips span,
+:root[data-theme="dark"] .mini-tags span,
+:root[data-theme="dark"] .route-strip span,
+:root[data-theme="dark"] .day-meta span,
+:root[data-theme="dark"] .cost-chip,
+:root[data-theme="dark"] .route-connector span,
+:root[data-theme="dark"] .pacing-pill {
+  border-color: var(--line);
+  background: #20302a;
+  color: #e6eee8;
+}
+
+:root[data-theme="dark"] .cost-chip small,
+:root[data-theme="dark"] .budget-row strong small,
+:root[data-theme="dark"] .compact-logistics-card summary small {
+  color: #b8c8c0;
+}
+
+:root[data-theme="dark"] .icon-button,
+:root[data-theme="dark"] .drag-handle,
+:root[data-theme="dark"] .bookmark-button {
+  border-color: var(--line);
+  background: #f2f7f0;
+  color: #1b2a24;
+}
+
+:root[data-theme="dark"] .map-route-summary,
+:root[data-theme="dark"] .detail-list,
+:root[data-theme="dark"] .info-tile,
+:root[data-theme="dark"] .source-note,
+:root[data-theme="dark"] .compact-details {
+  border-color: var(--line);
+  background: #111d19;
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .map-canvas,
+:root[data-theme="dark"] .overview-map-canvas {
+  border-color: var(--line);
+  background-color: #16231f;
+}
+
+:root[data-theme="dark"] .preview-title,
+:root[data-theme="dark"] .preview-reveal {
+  color: #f6faf5;
+}
+
+:root[data-theme="dark"] .no-real-image .place-preview-button,
+:root[data-theme="dark"] .browser-grid .place-card.no-real-image {
+  background: #17231f;
+  border-color: var(--line);
+}

@@ -56,7 +56,7 @@ import { peruDayRouteSummaries, peruRouteSuggestions, peruTrip } from "./peruIti
 import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
 
 type AppView = "dashboard" | "itinerary" | "places" | "budget" | "maps" | "more";
-type ThemePreference = "system" | "light" | "dark";
+type ThemePreference = "light" | "dark";
 
 declare global {
   interface Window {
@@ -143,6 +143,10 @@ function parseStored<T>(key: string): T | null {
   } catch {
     return null;
   }
+}
+
+function normalizeThemePreference(value: unknown): ThemePreference {
+  return value === "dark" ? "dark" : "light";
 }
 
 function hydrateJapanActivities(activities: Activity[]) {
@@ -344,7 +348,7 @@ function defaultState(): MultiTripState {
     },
     japanBranch,
     japanCadToJpy: legacy?.cadToJpy || DEFAULT_CAD_TO_JPY,
-    themePreference: "system",
+    themePreference: "light",
     updatedAt: new Date().toISOString(),
   };
 }
@@ -359,7 +363,7 @@ function loadState(): MultiTripState {
     activeTripId: stored.activeTripId || "japan-2026",
     japanBranch: stored.japanBranch || "hokkaido",
     japanCadToJpy: stored.japanCadToJpy || DEFAULT_CAD_TO_JPY,
-    themePreference: stored.themePreference || "system",
+    themePreference: normalizeThemePreference(stored.themePreference),
     trips: {
       "japan-2026": mergeTrip(defaults.trips["japan-2026"], stored.trips["japan-2026"]),
       "peru-2026": mergeTrip(peruTrip, stored.trips["peru-2026"]),
@@ -566,7 +570,6 @@ function App() {
   const [saveStatus, setSaveStatus] = useState("Saved locally");
   const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(() => new Set());
   const [loadedImageIds, setLoadedImageIds] = useState<Set<string>>(() => new Set());
-  const [systemDark, setSystemDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
   const [updateReady, setUpdateReady] = useState(false);
 
   const sensors = useSensors(
@@ -621,16 +624,8 @@ function App() {
 
   const budget = useMemo(() => makeBudget(activeTrip, allVisibleActivities), [activeTrip, allVisibleActivities]);
   const routeSuggestions = useMemo(() => makeRouteSuggestions(activeTrip, allVisibleActivities), [activeTrip, allVisibleActivities]);
-  const resolvedTheme = state.themePreference === "system" ? (systemDark ? "dark" : "light") : state.themePreference;
+  const resolvedTheme = state.themePreference;
   const activeExchangeRate = getExchangeRate(activeTrip, state.japanCadToJpy);
-
-  useEffect(() => {
-    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
-    if (!media) return;
-    const onChange = () => setSystemDark(media.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
 
   useEffect(() => {
     const onUpdateReady = () => setUpdateReady(true);
@@ -1176,11 +1171,11 @@ function DayRail({
 }
 
 function ThemeToggle({ preference, resolvedTheme, setPreference }: { preference: ThemePreference; resolvedTheme: string; setPreference: (preference: ThemePreference) => void }) {
-  const next = preference === "system" ? "dark" : preference === "dark" ? "light" : "system";
+  const next = preference === "dark" ? "light" : "dark";
   return (
     <button className="ghost-button" type="button" onClick={() => setPreference(next)} title="Toggle theme">
       {resolvedTheme === "dark" ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}
-      {preference === "system" ? "System" : preference}
+      {preference === "dark" ? "Dark" : "Light"}
     </button>
   );
 }
