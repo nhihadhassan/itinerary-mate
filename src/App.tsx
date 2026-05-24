@@ -921,6 +921,8 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
+  const isJapanExploreView = activeTrip.id === "japan-2026" && activeView === "places";
+
   return (
     <div className={`app-shell trip-${activeTrip.id === "peru-2026" ? "peru" : "japan"}`}>
       <header className="topbar">
@@ -953,7 +955,7 @@ function App() {
         ))}
       </nav>
 
-      {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && (
+      {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !isJapanExploreView && (
         <DayRail
           days={days}
           activities={allVisibleActivities}
@@ -964,8 +966,8 @@ function App() {
         />
       )}
 
-      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""}`}>
-        <aside className="side-panel">
+      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${isJapanExploreView ? "explore-main-grid" : ""}`}>
+        {!isJapanExploreView && <aside className="side-panel">
           {activeTrip.id === "japan-2026" && (
             <section className="card route-card">
               <div className="section-heading">
@@ -1002,7 +1004,7 @@ function App() {
             <strong>Installable PWA</strong>
             <span>Core app and saved edits work offline. External images and live data may not.</span>
           </section>}
-        </aside>
+        </aside>}
 
         <div className="content-stack">
           {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && (
@@ -1870,13 +1872,13 @@ function JapanExploreCard({
                 </select>
               </label>
               <button className="primary-button" type="button" onClick={() => addPlaceToItinerary(place, selectedDay)}>
-                <Plus size={16} aria-hidden="true" /> Add to itinerary
+                <Plus size={16} aria-hidden="true" /> Add
               </button>
               <button className="ghost-button" type="button" onClick={() => copyQuery(place)}>
-                <Clipboard size={16} aria-hidden="true" /> Copy query
+                <Clipboard size={16} aria-hidden="true" /> Copy
               </button>
               <a className="ghost-link-button" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.googleMapsQuery)}`} target="_blank" rel="noreferrer">
-                <MapIcon size={16} aria-hidden="true" /> Open map
+                <MapIcon size={16} aria-hidden="true" /> Map
               </a>
             </div>
           </div>
