@@ -53,6 +53,8 @@ import {
   tripAnchors,
 } from "./japanItinerary";
 import { peruDayRouteSummaries, peruRouteSuggestions, peruTrip } from "./peruItinerary";
+import { japanExploreKinds, japanExplorePlaces } from "./japanExplore";
+import type { JapanExploreKind, JapanExplorePlace } from "./japanExplore";
 import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
 
 type AppView = "dashboard" | "itinerary" | "places" | "budget" | "maps" | "more";
@@ -374,6 +376,13 @@ function loadState(): MultiTripState {
 function formatDate(date?: string) {
   if (!date) return "";
   return new Intl.DateTimeFormat("en-CA", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${date}T12:00:00`));
+}
+
+function dateForTripDay(startDate: string | undefined, day: number) {
+  if (!startDate) return undefined;
+  const date = new Date(`${startDate}T12:00:00`);
+  date.setDate(date.getDate() + Math.max(0, day - 1));
+  return date.toISOString().slice(0, 10);
 }
 
 function formatMoney(value: number, currency: string, localPerCad = DEFAULT_CAD_TO_JPY) {
@@ -785,6 +794,57 @@ function App() {
     setActiveView("itinerary");
   }
 
+  function addJapanExplorePlace(place: JapanExplorePlace, day: number) {
+    const id = `japan-2026-idea-${place.id}-${Date.now()}`;
+    const isFood = place.kind === "Food" || place.kind === "Restaurants";
+    const newActivity: TripActivity = {
+      id,
+      tripId: "japan-2026",
+      day,
+      date: dateForTripDay(activeTrip.startDate, day),
+      city: place.city === "Hokkaido" || place.city === "Kyushu" ? place.neighborhood : place.city,
+      region: place.region,
+      country: "Japan",
+      title: place.title,
+      type: isFood ? "food" : "activity",
+      description: place.description,
+      category: isFood ? "Food" : place.kind === "Day Trips" || place.kind === "Branch Ideas" ? "Nice To Have" : "Extra",
+      address: "",
+      googleMapsQuery: place.googleMapsQuery,
+      duration: place.recommendedTime ? `${place.recommendedTime} idea` : "Add timing",
+      travelTimeFromPrevious: "Add estimate",
+      transportMode: "",
+      estimatedCost: place.estimatedCostJpy,
+      estimatedCostLow: place.estimatedCostJpy,
+      estimatedCostMid: place.estimatedCostJpy,
+      estimatedCostHigh: place.estimatedCostJpy,
+      currency: "JPY",
+      costLocal: place.estimatedCostJpy,
+      localCurrencyCode: "JPY",
+      costCad: Number((place.estimatedCostJpy / activeExchangeRate).toFixed(2)),
+      costCategory: isFood ? "food" : "activity",
+      costStatus: "manual",
+      bookingStatus: "not-booked",
+      attachmentIds: [],
+      notes: `Added from Japan Explore research board. Why go: ${place.whyGo}`,
+      imageUrl: place.imageUrl || placeholderFor(place.title),
+      imageAlt: place.imageAlt,
+      imageCredit: place.imageCredit,
+      imageCreditUrl: place.imageCreditUrl,
+      imageLicense: place.imageLicense,
+      imageSearchQuery: place.imageSearchQuery,
+      priority: 3,
+      isBooked: false,
+      isCompleted: false,
+      source: "manual",
+    };
+    updateActiveTrip({ activities: [newActivity, ...activeTrip.activities] });
+    setExpandedId(id);
+    setSelectedDay(day);
+    setActiveView("itinerary");
+    setSaveStatus(`Added ${place.title} to Day ${day}`);
+  }
+
   function deleteActivity(id: string) {
     const item = activeTrip.activities.find((activity) => activity.id === id);
     if (!item || !window.confirm(`Delete "${item.title}" from ${activeTrip.title}?`)) return;
@@ -945,7 +1005,7 @@ function App() {
         </aside>
 
         <div className="content-stack">
-          {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && (
+          {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && (
             <FilterBar
               query={query}
               setQuery={setQuery}
@@ -1000,19 +1060,33 @@ function App() {
           )}
 
           {activeView === "places" && (
-            <PlaceBrowser
-              activities={placeBrowserActivities}
-              expandedId={expandedId}
-              setExpandedId={setExpandedId}
-              updateActivity={updateActivity}
-              deleteActivity={deleteActivity}
-              brokenImageIds={brokenImageIds}
-              setBrokenImageIds={setBrokenImageIds}
-              loadedImageIds={loadedImageIds}
-              setLoadedImageIds={setLoadedImageIds}
-              trip={activeTrip}
-              exchangeRate={activeExchangeRate}
-            />
+            activeTrip.id === "japan-2026" ? (
+              <JapanExploreBoard
+                places={japanExplorePlaces}
+                days={days}
+                addPlaceToItinerary={addJapanExplorePlace}
+                brokenImageIds={brokenImageIds}
+                setBrokenImageIds={setBrokenImageIds}
+                loadedImageIds={loadedImageIds}
+                setLoadedImageIds={setLoadedImageIds}
+                exchangeRate={activeExchangeRate}
+                setSaveStatus={setSaveStatus}
+              />
+            ) : (
+              <PlaceBrowser
+                activities={placeBrowserActivities}
+                expandedId={expandedId}
+                setExpandedId={setExpandedId}
+                updateActivity={updateActivity}
+                deleteActivity={deleteActivity}
+                brokenImageIds={brokenImageIds}
+                setBrokenImageIds={setBrokenImageIds}
+                loadedImageIds={loadedImageIds}
+                setLoadedImageIds={setLoadedImageIds}
+                trip={activeTrip}
+                exchangeRate={activeExchangeRate}
+              />
+            )
           )}
 
           {activeView === "budget" && (
@@ -1595,6 +1669,221 @@ function ItineraryTimeline(props: {
 function DayDropZone({ day, children }: { day: number; children: ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
   return <article ref={setNodeRef} className={isOver ? "day-card drop-active" : "day-card"}>{children}</article>;
+}
+
+function JapanExploreBoard({
+  places,
+  days,
+  addPlaceToItinerary,
+  brokenImageIds,
+  setBrokenImageIds,
+  loadedImageIds,
+  setLoadedImageIds,
+  exchangeRate,
+  setSaveStatus,
+}: {
+  places: JapanExplorePlace[];
+  days: number[];
+  addPlaceToItinerary: (place: JapanExplorePlace, day: number) => void;
+  brokenImageIds: Set<string>;
+  setBrokenImageIds: Dispatch<SetStateAction<Set<string>>>;
+  loadedImageIds: Set<string>;
+  setLoadedImageIds: Dispatch<SetStateAction<Set<string>>>;
+  exchangeRate: number;
+  setSaveStatus: (status: string) => void;
+}) {
+  const [kind, setKind] = useState<"All" | JapanExploreKind>("All");
+  const [city, setCity] = useState("All");
+  const [query, setQuery] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [targetDayById, setTargetDayById] = useState<Record<string, number>>({});
+  const cities = useMemo(() => ["All", ...Array.from(new Set(places.map((place) => place.city))).sort()], [places]);
+  const filteredPlaces = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return places.filter((place) => {
+      const kindMatch = kind === "All" || place.kind === kind || place.tags.includes(kind);
+      const cityMatch = city === "All" || place.city === city;
+      const queryMatch =
+        !q ||
+        [place.title, place.city, place.region, place.neighborhood, place.kind, place.description, place.whyGo, ...place.tags]
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
+      return kindMatch && cityMatch && queryMatch;
+    });
+  }, [city, kind, places, query]);
+  const photoCount = filteredPlaces.filter((place) => isImageUrl(place.imageUrl) && !brokenImageIds.has(`japan-explore-${place.id}`)).length;
+
+  async function copyQuery(place: JapanExplorePlace) {
+    await copyText(place.googleMapsQuery);
+    setSaveStatus(`Copied ${place.title} map query`);
+  }
+
+  return (
+    <section className="japan-explore content-section">
+      <div className="japan-explore-hero">
+        <div>
+          <p className="eyebrow">Japan ideas, not booked yet</p>
+          <h2>Build your shortlist before locking the route.</h2>
+          <p>Browse places, food areas, neighborhoods, rainy-day swaps, and branch ideas. Add only the ones that feel worth protecting.</p>
+        </div>
+        <div className="japan-explore-stats" aria-label="Japan Explore summary">
+          <strong>{filteredPlaces.length}</strong>
+          <span>visible ideas</span>
+          <small>{photoCount} with photos, others use compact safe visuals</small>
+        </div>
+      </div>
+
+      <div className="japan-explore-toolbar">
+        <label className="search-field">
+          <Search size={17} aria-hidden="true" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search neighborhoods, food, temples, rainy days" />
+        </label>
+        <div className="chip-scroll" aria-label="Explore type filters">
+          {japanExploreKinds.map((option) => (
+            <button key={option} type="button" className={kind === option ? "chip active" : "chip"} onClick={() => setKind(option)}>
+              {option}
+            </button>
+          ))}
+        </div>
+        <div className="chip-scroll" aria-label="Explore city filters">
+          {cities.map((option) => (
+            <button key={option} type="button" className={city === option ? "chip active" : "chip"} onClick={() => setCity(option)}>
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filteredPlaces.length ? (
+        <div className="japan-idea-grid">
+          {filteredPlaces.map((place) => (
+            <JapanExploreCard
+              key={place.id}
+              place={place}
+              expanded={expandedId === place.id}
+              setExpanded={(expanded) => setExpandedId(expanded ? place.id : null)}
+              selectedDay={targetDayById[place.id] || 1}
+              setSelectedDay={(day) => setTargetDayById((current) => ({ ...current, [place.id]: day }))}
+              days={days}
+              addPlaceToItinerary={addPlaceToItinerary}
+              copyQuery={copyQuery}
+              brokenImageIds={brokenImageIds}
+              setBrokenImageIds={setBrokenImageIds}
+              loadedImageIds={loadedImageIds}
+              setLoadedImageIds={setLoadedImageIds}
+              exchangeRate={exchangeRate}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No Japan ideas match" body="Clear a filter or search something broader like food, rainy day, Kyoto, or Tokyo." />
+      )}
+    </section>
+  );
+}
+
+function JapanExploreCard({
+  place,
+  expanded,
+  setExpanded,
+  selectedDay,
+  setSelectedDay,
+  days,
+  addPlaceToItinerary,
+  copyQuery,
+  brokenImageIds,
+  setBrokenImageIds,
+  loadedImageIds,
+  setLoadedImageIds,
+  exchangeRate,
+}: {
+  place: JapanExplorePlace;
+  expanded: boolean;
+  setExpanded: (expanded: boolean) => void;
+  selectedDay: number;
+  setSelectedDay: (day: number) => void;
+  days: number[];
+  addPlaceToItinerary: (place: JapanExplorePlace, day: number) => void;
+  copyQuery: (place: JapanExplorePlace) => Promise<void>;
+  brokenImageIds: Set<string>;
+  setBrokenImageIds: Dispatch<SetStateAction<Set<string>>>;
+  loadedImageIds: Set<string>;
+  setLoadedImageIds: Dispatch<SetStateAction<Set<string>>>;
+  exchangeRate: number;
+}) {
+  const imageKey = `japan-explore-${place.id}`;
+  const hasImage = isImageUrl(place.imageUrl) && !brokenImageIds.has(imageKey);
+  const imageLoaded = loadedImageIds.has(imageKey);
+  return (
+    <article className={`japan-idea-card ${hasImage ? "has-real-image" : "no-real-image"} ${expanded ? "is-expanded" : ""}`}>
+      <button className="japan-idea-preview" type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
+        {hasImage && (
+          <div className={`japan-idea-image ${!imageLoaded ? "is-loading" : ""}`}>
+            <span className="image-skeleton" aria-hidden="true" />
+            <img
+              src={place.imageUrl}
+              alt={place.imageAlt}
+              loading="lazy"
+              decoding="async"
+              className={imageLoaded ? "loaded" : ""}
+              onLoad={() => setLoadedImageIds((current) => new Set(current).add(imageKey))}
+              onError={() => setBrokenImageIds((current) => new Set(current).add(imageKey))}
+            />
+          </div>
+        )}
+        <div className="japan-idea-title">
+          <span>{place.city} · {place.kind}</span>
+          <h3>{place.title}</h3>
+        </div>
+      </button>
+      <div className="japan-idea-body">
+        <p>{place.description}</p>
+        <div className="mini-tags">
+          {place.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}
+        </div>
+        <div className="meta-chips">
+          <span className="cost-chip">
+            <CircleDollarSign size={14} />
+            <b>{formatCadOnly(place.estimatedCostJpy, exchangeRate)}</b>
+            <small>{formatLocalOnly(place.estimatedCostJpy, "JPY")}</small>
+          </span>
+          <span><MapPin size={14} /> {place.neighborhood}</span>
+        </div>
+        {expanded && (
+          <div className="japan-idea-details">
+            <p><strong>Why go:</strong> {place.whyGo}</p>
+            <p><strong>Maps:</strong> {place.googleMapsQuery}</p>
+            <p><strong>Photo:</strong> {place.photoStatus === "wikimedia" ? "Wikimedia Commons" : "Compact fallback until a safe place photo is added."}</p>
+            {place.imageCredit && (
+              <p>
+                <strong>Image credit:</strong>{" "}
+                {place.imageCreditUrl ? <a href={place.imageCreditUrl} target="_blank" rel="noreferrer">{place.imageCredit}</a> : place.imageCredit}
+                {place.imageLicense ? `, ${place.imageLicense}` : ""}
+              </p>
+            )}
+            <div className="japan-idea-actions">
+              <label className="field">
+                <span>Add to day</span>
+                <select value={selectedDay} onChange={(event) => setSelectedDay(Number(event.target.value))}>
+                  {days.map((day) => <option key={day} value={day}>Day {day}</option>)}
+                </select>
+              </label>
+              <button className="primary-button" type="button" onClick={() => addPlaceToItinerary(place, selectedDay)}>
+                <Plus size={16} aria-hidden="true" /> Add to itinerary
+              </button>
+              <button className="ghost-button" type="button" onClick={() => copyQuery(place)}>
+                <Clipboard size={16} aria-hidden="true" /> Copy query
+              </button>
+              <a className="ghost-link-button" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.googleMapsQuery)}`} target="_blank" rel="noreferrer">
+                <MapIcon size={16} aria-hidden="true" /> Open map
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+    </article>
+  );
 }
 
 function ActivityCard({
