@@ -2667,6 +2667,92 @@ img {
   height: 18px;
 }
 
+.region-month-calendar {
+  display: grid;
+  gap: 6px;
+}
+
+.region-month-calendar .region-month-weekday {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.region-month-calendar {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.region-month-grid {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: repeat(5, minmax(48px, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-strong) 88%, var(--canvas));
+}
+
+.region-month-day {
+  position: relative;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 5px 5px 24px;
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.region-month-day:nth-child(7n) {
+  border-right: 0;
+}
+
+.region-month-day.trip-date {
+  color: var(--ink);
+}
+
+.region-span {
+  z-index: 2;
+  align-self: end;
+  min-width: 0;
+  height: 20px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--region-color, var(--trip-accent)) 78%, #1a2722);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--region-color, var(--trip-accent)) 86%, var(--surface-strong));
+  color: #fbfaf4;
+  font-size: 0.62rem;
+  font-weight: 850;
+  line-height: 18px;
+  padding: 0 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.region-span[style*="grid-column: 1"] {
+  margin-left: 4px;
+}
+
+.region-span {
+  margin-right: 4px;
+  margin-bottom: 5px;
+}
+
+.compact-region-calendar .region-month-grid {
+  grid-template-rows: repeat(5, 45px);
+}
+
+.compact-region-calendar .region-span {
+  height: 19px;
+  font-size: 0.58rem;
+  line-height: 17px;
+  padding: 0 5px;
+}
+
 .region-calendar-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));

@@ -1426,54 +1426,108 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
 }
 
 const peruRegionCalendar = [
-  { day: 1, region: "Cusco" },
-  { day: 2, region: "Cusco" },
-  { day: 3, region: "Sacred Valley" },
-  { day: 4, region: "Sacred Valley" },
-  { day: 5, region: "Machu Picchu" },
-  { day: 6, region: "Cusco" },
-  { day: 7, region: "Cusco" },
-  { day: 8, region: "Cusco" },
-  { day: 9, region: "Arequipa" },
-  { day: 10, region: "Arequipa" },
-  { day: 11, region: "Arequipa" },
-  { day: 12, region: "Arequipa" },
-  { day: 13, region: "Huacachina" },
-  { day: 14, region: "Huacachina" },
-  { day: 15, region: "Lima" },
-  { day: 16, region: "Lima" },
+  { startDay: 1, endDay: 2, region: "Cusco" },
+  { startDay: 3, endDay: 4, region: "Sacred Valley" },
+  { startDay: 5, endDay: 5, region: "Machu Picchu" },
+  { startDay: 6, endDay: 8, region: "Cusco" },
+  { startDay: 9, endDay: 12, region: "Arequipa" },
+  { startDay: 13, endDay: 14, region: "Huacachina" },
+  { startDay: 15, endDay: 16, region: "Lima" },
 ];
 
 function PeruRegionCalendar({ startDate, compact = false }: { startDate?: string; compact?: boolean }) {
   const regions = Array.from(new Set(peruRegionCalendar.map((item) => item.region)));
+  const monthDays = Array.from({ length: 31 }, (_, index) => index + 1);
+  const firstDayOffset = 3; // July 1, 2026 is a Wednesday.
+  const calendarSegments = peruRegionCalendar.flatMap((item) => getRegionCalendarSegments(item.startDay, item.endDay, startDate).map((segment, index) => ({ ...item, ...segment, segmentId: `${item.region}-${item.startDay}-${index}` })));
   return (
     <article className={`overview-region-calendar ${compact ? "compact-region-calendar" : ""}`}>
       <div className="section-heading compact-heading">
         <div>
           <p className="eyebrow">July 2026</p>
-          <h2>{compact ? "Region calendar" : "Where we are each day"}</h2>
+          <h2>{compact ? "Where we are" : "Where we are each day"}</h2>
         </div>
         <CalendarDays size={20} aria-hidden="true" />
       </div>
-      <div className="region-calendar-grid" aria-label="Peru region calendar">
-        {peruRegionCalendar.map((item) => {
-          const date = dateForTripDay(startDate, item.day);
+      <div className="region-month-calendar" aria-label="Peru July 2026 region calendar">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((weekday) => (
+          <span className="region-month-weekday" key={weekday}>{weekday}</span>
+        ))}
+        <div className="region-month-grid">
+          {monthDays.map((day) => {
+            const gridIndex = day + firstDayOffset;
+            const row = Math.floor((gridIndex - 1) / 7) + 1;
+            const column = ((gridIndex - 1) % 7) + 1;
+            const isTripDay = day >= 11 && day <= 26;
+            return (
+              <div
+                key={day}
+                className={`region-month-day ${isTripDay ? "trip-date" : ""}`}
+                style={{ gridColumn: column, gridRow: row }}
+              >
+                <span>{day}</span>
+              </div>
+            );
+          })}
+          {calendarSegments.map((item) => {
+            const startDateLabel = dateForTripDay(startDate, item.startDay);
+            const endDateLabel = dateForTripDay(startDate, item.endDay);
+            const ariaLabel = `${item.region}, ${startDateLabel ? formatCalendarDate(startDateLabel) : `day ${item.startDay}`} to ${endDateLabel ? formatCalendarDate(endDateLabel) : `day ${item.endDay}`}`;
+            return (
+              <div
+                key={item.segmentId}
+                className={`region-span region-${item.region.toLowerCase().replace(/\s+/g, "-")}`}
+                style={{ gridColumn: `${item.startCol} / ${item.endCol + 1}`, gridRow: item.row }}
+                aria-label={ariaLabel}
+                title={ariaLabel}
+              >
+                {item.region}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {!compact && (
+        <div className="region-calendar-grid" aria-label="Peru region calendar by trip day">
+          {Array.from({ length: 16 }, (_, index) => {
+            const day = index + 1;
+            const region = peruRegionCalendar.find((item) => day >= item.startDay && day <= item.endDay)?.region || "Peru";
+            const date = dateForTripDay(startDate, day);
           return (
-            <div key={item.day} className={`region-day region-${item.region.toLowerCase().replace(/\s+/g, "-")}`}>
-              <span>Day {item.day}</span>
-              <strong>{item.region}</strong>
+            <div key={day} className={`region-day region-${region.toLowerCase().replace(/\s+/g, "-")}`}>
+              <span>Day {day}</span>
+              <strong>{region}</strong>
               <small>{date ? formatCalendarDate(date) : "July 2026"}</small>
             </div>
           );
-        })}
-      </div>
-      <div className="region-calendar-legend" aria-label="Calendar regions">
-        {regions.map((region) => (
-          <span key={region} className={`region-dot region-${region.toLowerCase().replace(/\s+/g, "-")}`}>{region}</span>
-        ))}
-      </div>
+          })}
+        </div>
+      )}
+      {!compact && (
+        <div className="region-calendar-legend" aria-label="Calendar regions">
+          {regions.map((region) => (
+            <span key={region} className={`region-dot region-${region.toLowerCase().replace(/\s+/g, "-")}`}>{region}</span>
+          ))}
+        </div>
+      )}
     </article>
   );
+}
+
+function getRegionCalendarSegments(startDay: number, endDay: number, tripStartDate = "2026-07-11") {
+  const segments: Array<{ row: number; startCol: number; endCol: number }> = [];
+  let cursor = startDay;
+  while (cursor <= endDay) {
+    const date = dateForTripDay(tripStartDate, cursor);
+    const dateObject = date ? new Date(`${date}T12:00:00`) : undefined;
+    const weekRow = dateObject ? Math.floor((dateObject.getDate() + 3 - 1) / 7) + 1 : 1;
+    const startCol = dateObject ? dateObject.getDay() + 1 : 1;
+    const daysLeftInWeek = 8 - startCol;
+    const segmentLength = Math.min(daysLeftInWeek, endDay - cursor + 1);
+    segments.push({ row: weekRow, startCol, endCol: startCol + segmentLength - 1 });
+    cursor += segmentLength;
+  }
+  return segments;
 }
 
 type CalendarEventKind = "activity" | "food" | "hotel" | "flight" | "transport" | "note";
