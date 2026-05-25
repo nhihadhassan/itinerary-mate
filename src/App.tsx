@@ -57,7 +57,7 @@ import { japanExploreKinds, japanExplorePlaces } from "./japanExplore";
 import type { JapanExploreKind, JapanExplorePlace } from "./japanExplore";
 import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
 
-type AppView = "dashboard" | "itinerary" | "places" | "budget" | "maps" | "more";
+type AppView = "dashboard" | "itinerary" | "calendar" | "places" | "budget" | "maps" | "more";
 type ThemePreference = "light" | "dark";
 
 declare global {
@@ -96,7 +96,8 @@ const LEGACY_JAPAN_STORAGE_KEY = "september-japan-planner-v1";
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 let googleMapsLoader: Promise<any> | null = null;
 const tripOrder: TripId[] = ["japan-2026", "peru-2026"];
-const navItems: Array<{ id: AppView; label: string }> = [
+
+const baseNavItems: Array<{ id: AppView; label: string }> = [
   { id: "dashboard", label: "Overview" },
   { id: "itinerary", label: "Itinerary" },
   { id: "places", label: "Explore" },
@@ -587,6 +588,13 @@ function App() {
   );
 
   const activeTrip = state.trips[state.activeTripId];
+  const activeNavItems = useMemo(
+    () =>
+      activeTrip.id === "peru-2026"
+        ? baseNavItems.flatMap((item) => (item.id === "itinerary" ? [item, { id: "calendar" as AppView, label: "Calendar" }] : [item]))
+        : baseNavItems,
+    [activeTrip.id],
+  );
   const allVisibleActivities = useMemo(() => visibleActivities(activeTrip, state.japanBranch), [activeTrip, state.japanBranch]);
   const totalDays = useMemo(() => Math.max(...activeTrip.activities.map((activity) => activity.day), 1), [activeTrip.activities]);
   const days = useMemo(() => Array.from({ length: totalDays }, (_, index) => index + 1), [totalDays]);
@@ -922,6 +930,7 @@ function App() {
   }
 
   const isJapanExploreView = activeTrip.id === "japan-2026" && activeView === "places";
+  const isPeruCalendarView = activeTrip.id === "peru-2026" && activeView === "calendar";
 
   return (
     <div className={`app-shell trip-${activeTrip.id === "peru-2026" ? "peru" : "japan"}`}>
@@ -948,14 +957,14 @@ function App() {
       </header>
 
       <nav className="nav-tabs" aria-label="Planner sections">
-        {navItems.map((item) => (
+        {activeNavItems.map((item) => (
           <button key={item.id} type="button" className={activeView === item.id ? "active" : ""} onClick={() => setActiveView(item.id)}>
             {item.label}
           </button>
         ))}
       </nav>
 
-      {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !isJapanExploreView && (
+      {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !isJapanExploreView && !isPeruCalendarView && (
         <DayRail
           days={days}
           activities={allVisibleActivities}
@@ -966,8 +975,8 @@ function App() {
         />
       )}
 
-      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${isJapanExploreView ? "explore-main-grid" : ""}`}>
-        {!isJapanExploreView && <aside className="side-panel">
+      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${(isJapanExploreView || isPeruCalendarView) ? "explore-main-grid" : ""}`}>
+        {!isJapanExploreView && !isPeruCalendarView && <aside className="side-panel">
           {activeTrip.id === "japan-2026" && (
             <section className="card route-card">
               <div className="section-heading">
@@ -1007,7 +1016,7 @@ function App() {
         </aside>}
 
         <div className="content-stack">
-          {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && (
+          {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && !isPeruCalendarView && (
             <FilterBar
               query={query}
               setQuery={setQuery}
@@ -1059,6 +1068,18 @@ function App() {
                 selectedDay={selectedDay}
               />
             </div>
+          )}
+
+          {activeView === "calendar" && activeTrip.id === "peru-2026" && (
+            <PeruCalendar
+              trip={activeTrip}
+              activities={allVisibleActivities}
+              exchangeRate={activeExchangeRate}
+              openItineraryDay={(day) => {
+                setSelectedDay(day);
+                setActiveView("itinerary");
+              }}
+            />
           )}
 
           {activeView === "places" && (
@@ -1335,9 +1356,14 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
             <p className="eyebrow">{formatDate(trip.startDate)} to {formatDate(trip.endDate)}</p>
             <h2>Peru Trip</h2>
           </div>
-          <button className="ghost-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(2)")?.click()}>
-            Open itinerary
-          </button>
+          <div className="button-row">
+            <button className="ghost-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(2)")?.click()}>
+              Open itinerary
+            </button>
+            <button className="primary-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(3)")?.click()}>
+              <CalendarDays size={17} aria-hidden="true" /> Open calendar
+            </button>
+          </div>
         </div>
         <div className="dashboard-grid peru-dashboard-grid">
           <MetricCard label="Total" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={formatLocalOnly(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
@@ -1393,6 +1419,370 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
 
       <SuggestionList suggestions={routeSuggestions.slice(0, 4)} />
       <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
+    </section>
+  );
+}
+
+type CalendarEventKind = "activity" | "food" | "hotel" | "flight" | "transport" | "note";
+
+interface TripCalendarEvent {
+  id: string;
+  date: string;
+  day?: number;
+  title: string;
+  city: string;
+  kind: CalendarEventKind;
+  category: TripCategory | "Stay";
+  startTime?: string;
+  endTime?: string;
+  duration?: string;
+  route?: string;
+  costLocal?: number;
+  currency: string;
+  status?: string;
+  address?: string;
+  notes?: string;
+  source: "activity" | "flight" | "hotel";
+}
+
+function addIsoDays(date: string, amount: number) {
+  const next = new Date(`${date}T12:00:00`);
+  next.setDate(next.getDate() + amount);
+  return next.toISOString().slice(0, 10);
+}
+
+function enumerateDates(startDate?: string, endDate?: string) {
+  if (!startDate || !endDate) return [];
+  const dates: string[] = [];
+  for (let cursor = startDate; cursor <= endDate; cursor = addIsoDays(cursor, 1)) {
+    dates.push(cursor);
+  }
+  return dates;
+}
+
+function calendarKind(activity: TripActivity): CalendarEventKind {
+  if (activity.type === "flight" || activity.category === "Flight") return "flight";
+  if (activity.type === "hotel" || activity.category === "Hotel") return "hotel";
+  if (activity.type === "transport" || activity.category === "Transit") return "transport";
+  if (activity.type === "food" || activity.category === "Food") return "food";
+  if (activity.type === "note" || activity.category === "Note") return "note";
+  return "activity";
+}
+
+function sortCalendarEvents(events: TripCalendarEvent[]) {
+  const kindWeight: Record<CalendarEventKind, number> = { flight: 0, hotel: 1, transport: 2, activity: 3, food: 4, note: 5 };
+  return [...events].sort((a, b) => {
+    const timeA = a.startTime ? Number(a.startTime.replace(":", "")) : 9999;
+    const timeB = b.startTime ? Number(b.startTime.replace(":", "")) : 9999;
+    if (timeA !== timeB) return timeA - timeB;
+    if (kindWeight[a.kind] !== kindWeight[b.kind]) return kindWeight[a.kind] - kindWeight[b.kind];
+    return a.title.localeCompare(b.title);
+  });
+}
+
+function makeCalendarEvents(trip: Trip, activities: TripActivity[], exchangeRate: number): TripCalendarEvent[] {
+  const activityEvents = activities.map((activity): TripCalendarEvent => {
+    const localCost = activity.costLocal ?? activity.estimatedCost;
+    return {
+      id: `activity-${activity.id}`,
+      date: activity.date || dateForTripDay(trip.startDate, activity.day) || trip.startDate || "",
+      day: activity.day,
+      title: activity.title,
+      city: activity.city,
+      kind: calendarKind(activity),
+      category: activity.category,
+      startTime: activity.startTime,
+      endTime: activity.endTime,
+      duration: activity.duration,
+      route: routeTimeLabel(activity),
+      costLocal: localCost || undefined,
+      currency: activity.localCurrencyCode || activity.currency,
+      status: activityStatusLabel(activity),
+      address: activity.address,
+      notes: cleanUiText(activity.notes || activity.description),
+      source: "activity",
+    };
+  });
+
+  const flightEvents = trip.flights.map((flight): TripCalendarEvent => ({
+    id: `flight-${flight.id}`,
+    date: flight.departureTime.slice(0, 10),
+    title: `${flight.airline} ${flight.flightNumber}`,
+    city: flight.departureAirport,
+    kind: "flight",
+    category: "Flight",
+    startTime: flight.departureTime.slice(11, 16),
+    endTime: flight.arrivalTime.slice(11, 16),
+    duration: `${flight.departureAirport} to ${flight.arrivalAirport}`,
+    route: "Flight",
+    costLocal: flight.costLocal ?? (flight.costCad ? Math.round(flight.costCad * exchangeRate) : undefined),
+    currency: flight.localCurrencyCode || trip.currency,
+    status: flight.status,
+    notes: cleanUiText(flight.notes || ""),
+    source: "flight",
+  }));
+
+  const hotelEvents = trip.hotels.flatMap((hotel): TripCalendarEvent[] => {
+    if (!hotel.checkIn) return [];
+    const events: TripCalendarEvent[] = [];
+    const end = hotel.checkOut || hotel.checkIn;
+    const stayDates = enumerateDates(hotel.checkIn, addIsoDays(end, -1));
+    stayDates.forEach((date, index) => {
+      events.push({
+        id: `hotel-${hotel.id}-${date}`,
+        date,
+        title: index === 0 ? `Check in: ${hotel.name}` : `Stay: ${hotel.name}`,
+        city: hotel.city,
+        kind: "hotel",
+        category: "Stay",
+        costLocal: index === 0 ? hotel.costLocal ?? hotel.estimatedCost : undefined,
+        currency: hotel.localCurrencyCode || hotel.currency,
+        status: hotel.confirmation ? "Booked" : "Stay",
+        address: hotel.address,
+        notes: cleanUiText(hotel.notes || ""),
+        source: "hotel",
+      });
+    });
+    if (hotel.checkOut) {
+      events.push({
+        id: `hotel-${hotel.id}-checkout`,
+        date: hotel.checkOut,
+        title: `Check out: ${hotel.name}`,
+        city: hotel.city,
+        kind: "hotel",
+        category: "Stay",
+        currency: hotel.localCurrencyCode || hotel.currency,
+        status: "Check-out",
+        address: hotel.address,
+        notes: cleanUiText(hotel.notes || ""),
+        source: "hotel",
+      });
+    }
+    return events;
+  });
+
+  return [...activityEvents, ...flightEvents, ...hotelEvents].filter((event) => event.date);
+}
+
+function formatCalendarDate(date: string, includeYear = false) {
+  return new Intl.DateTimeFormat("en-CA", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    ...(includeYear ? { year: "numeric" } : {}),
+  }).format(new Date(`${date}T12:00:00`));
+}
+
+function calendarMonthCells(monthDate: string) {
+  const base = new Date(`${monthDate.slice(0, 7)}-01T12:00:00`);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const first = new Date(year, month, 1, 12);
+  const startOffset = first.getDay();
+  const cells: Array<{ date: string; inMonth: boolean }> = [];
+  const start = new Date(first);
+  start.setDate(first.getDate() - startOffset);
+  for (let index = 0; index < 42; index += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    cells.push({
+      date: date.toISOString().slice(0, 10),
+      inMonth: date.getMonth() === month,
+    });
+  }
+  return cells;
+}
+
+function icsDate(date: string, time?: string) {
+  const compactDate = date.replace(/-/g, "");
+  if (!time) return compactDate;
+  return `${compactDate}T${time.replace(":", "")}00`;
+}
+
+function escapeIcs(text = "") {
+  return text.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
+function downloadTripIcs(trip: Trip, events: TripCalendarEvent[]) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Itinerary Mate//Peru Trip//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+  ];
+  events.forEach((event) => {
+    const description = [event.duration, event.route, event.notes].filter(Boolean).join(" | ");
+    lines.push("BEGIN:VEVENT");
+    lines.push(`UID:${escapeIcs(event.id)}@itinerary-mate`);
+    lines.push(`DTSTAMP:${stamp}`);
+    if (event.startTime) {
+      lines.push(`DTSTART:${icsDate(event.date, event.startTime)}`);
+      lines.push(`DTEND:${icsDate(event.date, event.endTime || event.startTime)}`);
+    } else {
+      lines.push(`DTSTART;VALUE=DATE:${icsDate(event.date)}`);
+      lines.push(`DTEND;VALUE=DATE:${icsDate(addIsoDays(event.date, 1))}`);
+    }
+    lines.push(`SUMMARY:${escapeIcs(event.title)}`);
+    if (event.address || event.city) lines.push(`LOCATION:${escapeIcs(event.address || event.city)}`);
+    if (description) lines.push(`DESCRIPTION:${escapeIcs(description)}`);
+    lines.push(`CATEGORIES:${escapeIcs(event.kind)}`);
+    lines.push("END:VEVENT");
+  });
+  lines.push("END:VCALENDAR");
+  const blob = new Blob([lines.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${trip.id}-calendar.ics`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function PeruCalendar({ trip, activities, exchangeRate, openItineraryDay }: { trip: Trip; activities: TripActivity[]; exchangeRate: number; openItineraryDay: (day: number) => void }) {
+  const tripDates = useMemo(() => enumerateDates(trip.startDate, trip.endDate), [trip.endDate, trip.startDate]);
+  const [selectedDate, setSelectedDate] = useState(trip.startDate || tripDates[0] || "");
+  const events = useMemo(() => makeCalendarEvents(trip, activities, exchangeRate), [activities, exchangeRate, trip]);
+  const eventsByDate = useMemo(
+    () =>
+      events.reduce<Record<string, TripCalendarEvent[]>>((acc, event) => {
+        acc[event.date] = sortCalendarEvents([...(acc[event.date] || []), event]);
+        return acc;
+      }, {}),
+    [events],
+  );
+  const selectedEvents = eventsByDate[selectedDate] || [];
+  const activityEvents = selectedEvents.filter((event) => event.source === "activity");
+  const selectedDay = activityEvents[0]?.day || activities.find((activity) => activity.date === selectedDate)?.day;
+  const selectedCost = activityEvents.reduce((sum, event) => sum + (event.costLocal || 0), 0);
+  const monthCells = calendarMonthCells(trip.startDate || selectedDate || "2026-07-01");
+  const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const tightDays = new Set(
+    tripDates.filter((date) => {
+      const dayEvents = eventsByDate[date] || [];
+      const transitCount = dayEvents.filter((event) => event.kind === "flight" || event.kind === "transport").length;
+      return dayEvents.length >= 6 || transitCount >= 2;
+    }),
+  );
+
+  return (
+    <section className="content-section trip-calendar">
+      <div className="calendar-hero">
+        <div>
+          <p className="eyebrow">Booked trip calendar</p>
+          <h2>Peru schedule at a glance</h2>
+          <p>Flights, stays, route days, costs, and flexible stops in one place.</p>
+        </div>
+        <div className="calendar-actions">
+          <button className="primary-button" type="button" onClick={() => downloadTripIcs(trip, events)}>
+            <Download size={17} aria-hidden="true" /> Export .ics
+          </button>
+          {selectedDay && (
+            <button className="ghost-button" type="button" onClick={() => openItineraryDay(selectedDay)}>
+              Open Day {selectedDay}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="trip-date-strip" aria-label="Peru trip dates">
+        {tripDates.map((date, index) => {
+          const dayEvents = eventsByDate[date] || [];
+          return (
+            <button key={date} type="button" className={selectedDate === date ? "trip-date active" : "trip-date"} onClick={() => setSelectedDate(date)}>
+              <span>Day {index + 1}</span>
+              <strong>{formatCalendarDate(date)}</strong>
+              <small>{dayEvents.length} items</small>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="calendar-layout">
+        <section className="month-card" aria-label="July 2026 calendar">
+          <div className="section-heading compact-heading">
+            <div>
+              <p className="eyebrow">Month view</p>
+              <h3>July 2026</h3>
+            </div>
+            <span>{events.length} calendar items</span>
+          </div>
+          <div className="month-grid weekday-grid" aria-hidden="true">
+            {weekdayLabels.map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="month-grid">
+            {monthCells.map((cell) => {
+              const dayEvents = eventsByDate[cell.date] || [];
+              const inTrip = tripDates.includes(cell.date);
+              return (
+                <button
+                  key={cell.date}
+                  type="button"
+                  className={`month-cell ${cell.inMonth ? "" : "muted"} ${inTrip ? "in-trip" : ""} ${selectedDate === cell.date ? "active" : ""}`}
+                  onClick={() => setSelectedDate(cell.date)}
+                >
+                  <span>{Number(cell.date.slice(-2))}</span>
+                  <div className="calendar-pills">
+                    {dayEvents.slice(0, 4).map((event) => (
+                      <i key={event.id} className={`calendar-pill event-${event.kind}`}>{event.kind === "transport" ? "Transit" : event.kind}</i>
+                    ))}
+                    {dayEvents.length > 4 && <i className="calendar-pill more-pill">+{dayEvents.length - 4}</i>}
+                  </div>
+                  {tightDays.has(cell.date) && <em>Tight</em>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <aside className="agenda-card">
+          <div className="section-heading compact-heading">
+            <div>
+              <p className="eyebrow">{selectedDay ? `Day ${selectedDay}` : "Selected day"}</p>
+              <h3>{selectedDate ? formatCalendarDate(selectedDate, true) : "Pick a date"}</h3>
+            </div>
+            <strong>
+              {selectedCost ? formatCadOnly(selectedCost, exchangeRate) : "$0 CAD"}
+              {selectedCost ? <small>{formatLocalOnly(selectedCost, trip.currency)}</small> : null}
+            </strong>
+          </div>
+          {tightDays.has(selectedDate) && (
+            <div className="calendar-warning">
+              <TriangleAlert size={16} aria-hidden="true" />
+              Tight logistics day. Keep buffers visible.
+            </div>
+          )}
+          {selectedEvents.length ? (
+            <div className="agenda-list">
+              {selectedEvents.map((event) => (
+                <article className={`agenda-item event-${event.kind}`} key={event.id}>
+                  <div className="agenda-time">
+                    <strong>{event.startTime || "All day"}</strong>
+                    {event.endTime && <span>{event.endTime}</span>}
+                  </div>
+                  <div>
+                    <p className="eyebrow">{event.city} · {event.category}</p>
+                    <h4>{event.title}</h4>
+                    {(event.duration || event.route) && <p>{event.duration || event.route}{event.duration && event.route ? ` · ${event.route}` : ""}</p>}
+                    {event.address && <p className="address-line"><MapPin size={14} aria-hidden="true" /> {event.address}</p>}
+                    <div className="meta-chips">
+                      {event.costLocal ? (
+                        <span className="cost-chip"><CircleDollarSign size={14} /><b>{formatCadOnly(event.costLocal, exchangeRate)}</b><small>{formatLocalOnly(event.costLocal, event.currency)}</small></span>
+                      ) : (
+                        <span><CircleDollarSign size={14} /> Cost not set</span>
+                      )}
+                      {event.status && <span><BadgeCheck size={14} /> {event.status}</span>}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Nothing scheduled" body="This date is outside the imported Peru plan or has no saved items yet." />
+          )}
+        </aside>
+      </div>
     </section>
   );
 }
