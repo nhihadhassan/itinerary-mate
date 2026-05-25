@@ -55,9 +55,11 @@ import {
 import { peruDayRouteSummaries, peruRouteSuggestions, peruTrip } from "./peruItinerary";
 import { japanExploreKinds, japanExplorePlaces } from "./japanExplore";
 import type { JapanExploreKind, JapanExplorePlace } from "./japanExplore";
+import { discoveryKinds, discoveryPlaces, discoveryWindows } from "./discoveryPlaces";
+import type { DiscoveryKind, DiscoveryPlace, DiscoveryWindow } from "./discoveryPlaces";
 import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
 
-type AppView = "dashboard" | "itinerary" | "calendar" | "places" | "budget" | "maps" | "more";
+type AppView = "dashboard" | "itinerary" | "calendar" | "places" | "discovery" | "budget" | "maps" | "more";
 type ThemePreference = "light" | "dark";
 
 declare global {
@@ -101,6 +103,7 @@ const baseNavItems: Array<{ id: AppView; label: string }> = [
   { id: "dashboard", label: "Overview" },
   { id: "itinerary", label: "Itinerary" },
   { id: "places", label: "Explore" },
+  { id: "discovery", label: "Discovery" },
   { id: "budget", label: "Budget" },
   { id: "maps", label: "Map / Export" },
   { id: "more", label: "More" },
@@ -931,6 +934,7 @@ function App() {
 
   const isJapanExploreView = activeTrip.id === "japan-2026" && activeView === "places";
   const isPeruCalendarView = activeTrip.id === "peru-2026" && activeView === "calendar";
+  const isDiscoveryView = activeView === "discovery";
 
   return (
     <div className={`app-shell trip-${activeTrip.id === "peru-2026" ? "peru" : "japan"}`}>
@@ -964,7 +968,7 @@ function App() {
         ))}
       </nav>
 
-      {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !isJapanExploreView && !isPeruCalendarView && (
+      {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !isJapanExploreView && !isPeruCalendarView && !isDiscoveryView && (
         <DayRail
           days={days}
           activities={allVisibleActivities}
@@ -975,8 +979,8 @@ function App() {
         />
       )}
 
-      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${(isJapanExploreView || isPeruCalendarView) ? "explore-main-grid" : ""}`}>
-        {!isJapanExploreView && !isPeruCalendarView && <aside className="side-panel">
+      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${(isJapanExploreView || isPeruCalendarView || isDiscoveryView) ? "explore-main-grid" : ""}`}>
+        {!isJapanExploreView && !isPeruCalendarView && !isDiscoveryView && <aside className="side-panel">
           {activeTrip.id === "japan-2026" && (
             <section className="card route-card">
               <div className="section-heading">
@@ -1018,7 +1022,7 @@ function App() {
         </aside>}
 
         <div className="content-stack">
-          {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && !isPeruCalendarView && (
+          {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && !isPeruCalendarView && !isDiscoveryView && (
             <FilterBar
               query={query}
               setQuery={setQuery}
@@ -1112,6 +1116,17 @@ function App() {
                 exchangeRate={activeExchangeRate}
               />
             )
+          )}
+
+          {activeView === "discovery" && (
+            <DiscoveryBoard
+              places={discoveryPlaces}
+              brokenImageIds={brokenImageIds}
+              setBrokenImageIds={setBrokenImageIds}
+              loadedImageIds={loadedImageIds}
+              setLoadedImageIds={setLoadedImageIds}
+              setSaveStatus={setSaveStatus}
+            />
           )}
 
           {activeView === "budget" && (
@@ -2376,6 +2391,213 @@ function JapanExploreCard({
               </button>
               <a className="ghost-link-button" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.googleMapsQuery)}`} target="_blank" rel="noreferrer">
                 <MapIcon size={16} aria-hidden="true" /> Map
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function DiscoveryBoard({
+  places,
+  brokenImageIds,
+  setBrokenImageIds,
+  loadedImageIds,
+  setLoadedImageIds,
+  setSaveStatus,
+}: {
+  places: DiscoveryPlace[];
+  brokenImageIds: Set<string>;
+  setBrokenImageIds: Dispatch<SetStateAction<Set<string>>>;
+  loadedImageIds: Set<string>;
+  setLoadedImageIds: Dispatch<SetStateAction<Set<string>>>;
+  setSaveStatus: (status: string) => void;
+}) {
+  const [windowFilter, setWindowFilter] = useState<"All" | DiscoveryWindow>("All");
+  const [kindFilter, setKindFilter] = useState<"All" | DiscoveryKind>("All");
+  const [query, setQuery] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const countries = useMemo(() => ["All", ...Array.from(new Set(places.map((place) => place.country))).sort()], [places]);
+  const [countryFilter, setCountryFilter] = useState("All");
+
+  const filteredPlaces = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return places.filter((place) => {
+      const windowMatch = windowFilter === "All" || place.bestWindow === windowFilter || place.bestWindow === "Both windows";
+      const kindMatch = kindFilter === "All" || place.kind === kindFilter;
+      const countryMatch = countryFilter === "All" || place.country === countryFilter;
+      const queryMatch =
+        !q ||
+        [place.title, place.country, place.region, place.bestWindow, place.kind, place.summary, place.whyGo, ...place.tags]
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
+      return windowMatch && kindMatch && countryMatch && queryMatch;
+    });
+  }, [countryFilter, kindFilter, places, query, windowFilter]);
+
+  const photoCount = filteredPlaces.filter((place) => isImageUrl(place.imageUrl) && !brokenImageIds.has(`discovery-${place.id}`)).length;
+
+  async function copyQuery(place: DiscoveryPlace) {
+    await copyText(place.googleMapsQuery);
+    setSaveStatus(`Copied ${place.title} map query`);
+  }
+
+  return (
+    <section className="discovery-board content-section">
+      <div className="discovery-hero">
+        <div>
+          <p className="eyebrow">Open travel windows</p>
+          <h2>Ideas for Jun 6-24 or Sep 1-12.</h2>
+          <p>Shortlist trips that fit your free windows. These are research ideas, not booked plans.</p>
+        </div>
+        <div className="discovery-window-cards" aria-label="Travel windows">
+          <button type="button" className={windowFilter === "June 6-24" ? "active" : ""} onClick={() => setWindowFilter("June 6-24")}>
+            <span>June</span>
+            <strong>6-24</strong>
+            <small>longer nature trips</small>
+          </button>
+          <button type="button" className={windowFilter === "Sep 1-12" ? "active" : ""} onClick={() => setWindowFilter("Sep 1-12")}>
+            <span>September</span>
+            <strong>1-12</strong>
+            <small>shoulder-season Europe</small>
+          </button>
+        </div>
+      </div>
+
+      <div className="japan-explore-toolbar discovery-toolbar">
+        <label className="search-field">
+          <Search size={17} aria-hidden="true" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search islands, hiking, food, road trips" />
+        </label>
+        <div className="chip-scroll" aria-label="Travel window filters">
+          {discoveryWindows.map((option) => (
+            <button key={option} type="button" className={windowFilter === option ? "chip active" : "chip"} onClick={() => setWindowFilter(option)}>
+              {option}
+            </button>
+          ))}
+        </div>
+        <div className="chip-scroll" aria-label="Discovery type filters">
+          {discoveryKinds.map((option) => (
+            <button key={option} type="button" className={kindFilter === option ? "chip active" : "chip"} onClick={() => setKindFilter(option)}>
+              {option}
+            </button>
+          ))}
+        </div>
+        <div className="chip-scroll" aria-label="Country filters">
+          {countries.map((option) => (
+            <button key={option} type="button" className={countryFilter === option ? "chip active" : "chip"} onClick={() => setCountryFilter(option)}>
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="discovery-summary-row">
+        <span><Sparkles size={16} aria-hidden="true" /> {filteredPlaces.length} ideas</span>
+        <span><MapIcon size={16} aria-hidden="true" /> {photoCount} photo cards</span>
+        <span><Plane size={16} aria-hidden="true" /> Budget ranges are rough CAD</span>
+      </div>
+
+      {filteredPlaces.length ? (
+        <div className="discovery-grid">
+          {filteredPlaces.map((place) => (
+            <DiscoveryCard
+              key={place.id}
+              place={place}
+              expanded={expandedId === place.id}
+              setExpanded={(expanded) => setExpandedId(expanded ? place.id : null)}
+              copyQuery={copyQuery}
+              brokenImageIds={brokenImageIds}
+              setBrokenImageIds={setBrokenImageIds}
+              loadedImageIds={loadedImageIds}
+              setLoadedImageIds={setLoadedImageIds}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No discovery ideas match" body="Clear a filter or search something broad like island, hiking, food, or coast." />
+      )}
+    </section>
+  );
+}
+
+function DiscoveryCard({
+  place,
+  expanded,
+  setExpanded,
+  copyQuery,
+  brokenImageIds,
+  setBrokenImageIds,
+  loadedImageIds,
+  setLoadedImageIds,
+}: {
+  place: DiscoveryPlace;
+  expanded: boolean;
+  setExpanded: (expanded: boolean) => void;
+  copyQuery: (place: DiscoveryPlace) => Promise<void>;
+  brokenImageIds: Set<string>;
+  setBrokenImageIds: Dispatch<SetStateAction<Set<string>>>;
+  loadedImageIds: Set<string>;
+  setLoadedImageIds: Dispatch<SetStateAction<Set<string>>>;
+}) {
+  const imageKey = `discovery-${place.id}`;
+  const hasImage = isImageUrl(place.imageUrl) && !brokenImageIds.has(imageKey);
+  const imageLoaded = loadedImageIds.has(imageKey);
+
+  return (
+    <article className={`discovery-card ${hasImage ? "has-real-image" : "no-real-image"} ${expanded ? "is-expanded" : ""}`}>
+      <button className="discovery-preview" type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
+        {hasImage && (
+          <div className={`discovery-image ${!imageLoaded ? "is-loading" : ""}`}>
+            <span className="image-skeleton" aria-hidden="true" />
+            <img
+              src={place.imageUrl}
+              alt={place.imageAlt}
+              loading="lazy"
+              decoding="async"
+              className={imageLoaded ? "loaded" : ""}
+              onLoad={() => setLoadedImageIds((current) => new Set(current).add(imageKey))}
+              onError={() => setBrokenImageIds((current) => new Set(current).add(imageKey))}
+            />
+          </div>
+        )}
+        <div className="discovery-title">
+          <span>{place.bestWindow} · {place.kind}</span>
+          <h3>{place.title}</h3>
+          <small>{place.region}</small>
+        </div>
+      </button>
+      <div className="discovery-body">
+        <p>{place.summary}</p>
+        <div className="mini-tags">
+          {place.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}
+        </div>
+        <div className="meta-chips">
+          <span><CalendarDays size={14} /> {place.idealLength}</span>
+          <span><CircleDollarSign size={14} /> {place.estimatedBudgetCad}</span>
+          <span><MapPin size={14} /> {place.country}</span>
+        </div>
+        {expanded && (
+          <div className="discovery-details">
+            <p><strong>Why go:</strong> {place.whyGo}</p>
+            <p><strong>Flight note:</strong> {place.flightNote}</p>
+            <p><strong>Maps:</strong> {place.googleMapsQuery}</p>
+            {place.imageCredit && (
+              <p>
+                <strong>Image:</strong>{" "}
+                {place.imageCreditUrl ? <a href={place.imageCreditUrl} target="_blank" rel="noreferrer">{place.imageCredit}</a> : place.imageCredit}
+                {place.imageLicense ? `, ${place.imageLicense}` : ""}
+              </p>
+            )}
+            <div className="discovery-actions">
+              <button className="ghost-button" type="button" onClick={() => copyQuery(place)}>
+                <Clipboard size={16} aria-hidden="true" /> Copy query
+              </button>
+              <a className="ghost-link-button" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.googleMapsQuery)}`} target="_blank" rel="noreferrer">
+                <MapIcon size={16} aria-hidden="true" /> Open map
               </a>
             </div>
           </div>
