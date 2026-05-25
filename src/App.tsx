@@ -1372,6 +1372,7 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
           <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
         </div>
         <div className="peru-overview-feature-grid">
+          <PeruRegionCalendar startDate={trip.startDate} />
           <PeruDestinationMap activities={activities} />
           <PeruImageSlideshow activities={activities} />
         </div>
@@ -1420,6 +1421,57 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
       <SuggestionList suggestions={routeSuggestions.slice(0, 4)} />
       <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
     </section>
+  );
+}
+
+const peruRegionCalendar = [
+  { day: 1, region: "Cusco" },
+  { day: 2, region: "Cusco" },
+  { day: 3, region: "Sacred Valley" },
+  { day: 4, region: "Sacred Valley" },
+  { day: 5, region: "Machu Picchu" },
+  { day: 6, region: "Cusco" },
+  { day: 7, region: "Cusco" },
+  { day: 8, region: "Cusco" },
+  { day: 9, region: "Arequipa" },
+  { day: 10, region: "Arequipa" },
+  { day: 11, region: "Arequipa" },
+  { day: 12, region: "Arequipa" },
+  { day: 13, region: "Huacachina" },
+  { day: 14, region: "Huacachina" },
+  { day: 15, region: "Lima" },
+  { day: 16, region: "Lima" },
+];
+
+function PeruRegionCalendar({ startDate }: { startDate?: string }) {
+  const regions = Array.from(new Set(peruRegionCalendar.map((item) => item.region)));
+  return (
+    <article className="overview-region-calendar">
+      <div className="section-heading compact-heading">
+        <div>
+          <p className="eyebrow">Trip rhythm</p>
+          <h2>Where we are each day</h2>
+        </div>
+        <CalendarDays size={20} aria-hidden="true" />
+      </div>
+      <div className="region-calendar-grid" aria-label="Peru region calendar">
+        {peruRegionCalendar.map((item) => {
+          const date = dateForTripDay(startDate, item.day);
+          return (
+            <div key={item.day} className={`region-day region-${item.region.toLowerCase().replace(/\s+/g, "-")}`}>
+              <span>Day {item.day}</span>
+              <strong>{item.region}</strong>
+              <small>{date ? formatCalendarDate(date) : "July 2026"}</small>
+            </div>
+          );
+        })}
+      </div>
+      <div className="region-calendar-legend" aria-label="Calendar regions">
+        {regions.map((region) => (
+          <span key={region} className={`region-dot region-${region.toLowerCase().replace(/\s+/g, "-")}`}>{region}</span>
+        ))}
+      </div>
+    </article>
   );
 }
 

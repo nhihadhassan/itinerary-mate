@@ -2626,6 +2626,7 @@ img {
 
 .overview-map-card,
 .overview-slideshow-card,
+.overview-region-calendar,
 .overview-logistics {
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -2635,10 +2636,100 @@ img {
 }
 
 .overview-map-card,
+.overview-region-calendar,
 .overview-logistics {
   display: grid;
   gap: 12px;
   padding: 14px;
+}
+
+.overview-region-calendar {
+  overflow: visible;
+}
+
+.region-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.region-day {
+  display: grid;
+  min-height: 86px;
+  align-content: space-between;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--region-color, var(--trip-accent)) 22%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--region-color, var(--trip-accent)) 13%, var(--surface-strong));
+  padding: 9px;
+}
+
+.region-day span,
+.region-day small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.region-day strong {
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  line-height: 1.08;
+}
+
+.region-cusco {
+  --region-color: #3f7a5c;
+}
+
+.region-sacred-valley {
+  --region-color: #b98834;
+}
+
+.region-machu-picchu {
+  --region-color: #5c73ad;
+}
+
+.region-arequipa {
+  --region-color: #c86647;
+}
+
+.region-huacachina {
+  --region-color: #d0a447;
+}
+
+.region-lima {
+  --region-color: #4f92a8;
+}
+
+.region-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.region-dot {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--region-color, var(--trip-accent)) 22%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--region-color, var(--trip-accent)) 10%, var(--surface-strong));
+  color: var(--muted);
+  padding: 6px 9px;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.region-dot::before {
+  content: "";
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 999px;
+  background: var(--region-color, var(--trip-accent));
 }
 
 .overview-map-canvas {
@@ -3133,6 +3224,10 @@ img {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .region-calendar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .trip-peru .itinerary-card.no-real-image {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3524,6 +3619,7 @@ img {
 :root[data-theme="dark"] .place-card,
 :root[data-theme="dark"] .map-panel,
 :root[data-theme="dark"] .overview-map-card,
+:root[data-theme="dark"] .overview-region-calendar,
 :root[data-theme="dark"] .overview-slideshow-card,
 :root[data-theme="dark"] .overview-logistics,
 :root[data-theme="dark"] .overview-mini-card,
