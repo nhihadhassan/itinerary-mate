@@ -2647,10 +2647,35 @@ img {
   overflow: visible;
 }
 
+.compact-region-calendar {
+  gap: 10px;
+  padding: 14px;
+  box-shadow: none;
+}
+
+.compact-region-calendar .compact-heading {
+  align-items: center;
+}
+
+.compact-region-calendar .compact-heading h2 {
+  font-size: 1.1rem;
+  line-height: 1.05;
+}
+
+.compact-region-calendar .compact-heading svg {
+  width: 18px;
+  height: 18px;
+}
+
 .region-calendar-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 8px;
+}
+
+.compact-region-calendar .region-calendar-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .region-day {
@@ -2664,6 +2689,12 @@ img {
   padding: 9px;
 }
 
+.compact-region-calendar .region-day {
+  min-height: 68px;
+  gap: 4px;
+  padding: 7px;
+}
+
 .region-day span,
 .region-day small {
   overflow: hidden;
@@ -2674,9 +2705,19 @@ img {
   white-space: nowrap;
 }
 
+.compact-region-calendar .region-day span,
+.compact-region-calendar .region-day small {
+  font-size: 0.62rem;
+}
+
 .region-day strong {
   overflow-wrap: anywhere;
   font-size: 0.92rem;
+  line-height: 1.08;
+}
+
+.compact-region-calendar .region-day strong {
+  font-size: 0.74rem;
   line-height: 1.08;
 }
 
@@ -2708,6 +2749,10 @@ img {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+}
+
+.compact-region-calendar .region-calendar-legend {
+  display: none;
 }
 
 .region-dot {

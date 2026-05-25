@@ -1008,6 +1008,8 @@ function App() {
             )}
           </section>
 
+          {activeTrip.id === "peru-2026" && <PeruRegionCalendar startDate={activeTrip.startDate} compact />}
+
           {activeTrip.id === "japan-2026" && <section className="card quick-card">
             <p className="eyebrow">Offline</p>
             <strong>Installable PWA</strong>
@@ -1372,7 +1374,6 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
           <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
         </div>
         <div className="peru-overview-feature-grid">
-          <PeruRegionCalendar startDate={trip.startDate} />
           <PeruDestinationMap activities={activities} />
           <PeruImageSlideshow activities={activities} />
         </div>
@@ -1443,14 +1444,14 @@ const peruRegionCalendar = [
   { day: 16, region: "Lima" },
 ];
 
-function PeruRegionCalendar({ startDate }: { startDate?: string }) {
+function PeruRegionCalendar({ startDate, compact = false }: { startDate?: string; compact?: boolean }) {
   const regions = Array.from(new Set(peruRegionCalendar.map((item) => item.region)));
   return (
-    <article className="overview-region-calendar">
+    <article className={`overview-region-calendar ${compact ? "compact-region-calendar" : ""}`}>
       <div className="section-heading compact-heading">
         <div>
-          <p className="eyebrow">Trip rhythm</p>
-          <h2>Where we are each day</h2>
+          <p className="eyebrow">July 2026</p>
+          <h2>{compact ? "Region calendar" : "Where we are each day"}</h2>
         </div>
         <CalendarDays size={20} aria-hidden="true" />
       </div>
