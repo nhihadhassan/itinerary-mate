@@ -24,8 +24,8 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
           });
         });
       })
-      .catch((error) => {
-        console.info("Service worker registration skipped", error);
+      .catch(() => {
+        // Non-blocking: the app still works if a browser refuses service worker registration.
       });
   });
 }

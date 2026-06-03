@@ -270,7 +270,7 @@ img {
   top: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
   margin: 8px 0 16px;
   border: 1px solid var(--line);
@@ -3372,11 +3372,11 @@ img {
 /* Focused cleanup pass: quieter controls, consistent trip cards, stable sticky bars. */
 .nav-tabs {
   top: 0;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .trip-peru .nav-tabs {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 
 .day-rail,
@@ -3589,11 +3589,11 @@ img {
 @media (max-width: 760px) {
   .nav-tabs {
     top: 86px;
-    grid-template-columns: repeat(6, minmax(92px, 1fr));
+    grid-template-columns: repeat(7, minmax(92px, 1fr));
   }
 
   .trip-peru .nav-tabs {
-    grid-template-columns: repeat(7, minmax(92px, 1fr));
+    grid-template-columns: repeat(8, minmax(92px, 1fr));
   }
 
   .day-rail,
@@ -4512,5 +4512,221 @@ img {
 
   .japan-idea-card.is-expanded {
     grid-column: 1 / -1;
+  }
+}
+
+/* Impeccable polish pass */
+html {
+  scroll-padding-top: 168px;
+}
+
+.nav-tabs,
+.day-rail,
+.chip-scroll,
+.chip-row {
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 8px;
+  scroll-snap-type: x proximity;
+}
+
+.nav-tabs,
+.day-rail,
+.filter-bar,
+.japan-explore-toolbar {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.72) inset,
+    0 14px 34px rgba(31, 47, 42, 0.08);
+}
+
+.nav-tabs button,
+.day-chip,
+.chip {
+  scroll-snap-align: start;
+  white-space: nowrap;
+}
+
+.nav-tabs button:hover,
+.trip-switcher button:hover,
+.chip:hover,
+.ghost-button:hover,
+.toggle:hover,
+.branch-toggle button:hover,
+.day-chip:hover,
+.icon-button:hover,
+.drag-handle:hover,
+.discovery-window-cards button:hover {
+  border-color: var(--line-strong);
+  background: color-mix(in srgb, var(--surface-strong) 78%, var(--trip-accent-2));
+  color: var(--ink);
+}
+
+.primary-button:hover,
+.compare-footer button:hover {
+  background: color-mix(in srgb, var(--green) 78%, var(--ink));
+}
+
+button:not(:disabled):active,
+.ghost-link-button:active {
+  transform: translateY(1px);
+}
+
+.card,
+.content-section,
+.place-card,
+.map-panel,
+.metric-card,
+.anchor-card,
+.japan-idea-card,
+.discovery-card,
+.place-preview-card,
+.overview-map-card,
+.overview-region-calendar,
+.overview-slideshow-card,
+.overview-logistics {
+  background-clip: padding-box;
+}
+
+.place-card,
+.japan-idea-card,
+.discovery-card,
+.place-preview-card,
+.map-panel,
+.metric-card {
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.japan-idea-card:hover,
+.discovery-card:hover,
+.place-preview-card:hover,
+.metric-card:hover {
+  border-color: color-mix(in srgb, var(--trip-accent) 24%, var(--line-strong));
+  box-shadow: 0 16px 34px rgba(43, 54, 49, 0.1);
+}
+
+.day-chip.active,
+.nav-tabs button.active,
+.chip.active {
+  box-shadow: 0 10px 24px rgba(24, 33, 31, 0.16);
+}
+
+.search-field,
+.field input,
+.field select,
+.field textarea,
+.select-field select {
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.search-field:focus-within,
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.select-field select:focus {
+  border-color: color-mix(in srgb, var(--blue) 42%, var(--line-strong));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--blue-soft) 62%, transparent);
+}
+
+.image-skeleton {
+  opacity: 0.9;
+}
+
+.region-month-grid {
+  min-width: 0;
+}
+
+.map-route-list div,
+.transit-step,
+.compact-logistics-card,
+.maps-row {
+  min-width: 0;
+}
+
+:root[data-theme="dark"] .nav-tabs,
+:root[data-theme="dark"] .day-rail,
+:root[data-theme="dark"] .filter-bar,
+:root[data-theme="dark"] .japan-explore-toolbar {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 16px 38px rgba(0, 0, 0, 0.32);
+}
+
+:root[data-theme="dark"] .japan-idea-card:hover,
+:root[data-theme="dark"] .discovery-card:hover,
+:root[data-theme="dark"] .place-preview-card:hover,
+:root[data-theme="dark"] .metric-card:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+}
+
+:root[data-theme="dark"] .discovery-summary-row span,
+:root[data-theme="dark"] .japan-explore-stats small,
+:root[data-theme="dark"] .discovery-details p,
+:root[data-theme="dark"] .japan-idea-details p {
+  color: #d1ded6;
+}
+
+:root[data-theme="dark"] .region-month-day {
+  border-color: #30443d;
+  background: #111d19;
+}
+
+:root[data-theme="dark"] .region-month-day.trip-date {
+  background: #172720;
+  color: #f2f7f0;
+}
+
+@media (max-width: 760px) {
+  html {
+    scroll-padding-top: 148px;
+  }
+
+  .app-shell {
+    padding-inline: 10px;
+  }
+
+  .brand-block h1 {
+    font-size: 2.15rem;
+  }
+
+  .nav-tabs {
+    scrollbar-width: none;
+  }
+
+  .nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-tabs button {
+    min-height: 42px;
+    padding: 9px 12px;
+    font-size: 0.84rem;
+  }
+
+  .day-chip {
+    min-width: 116px;
+    min-height: 58px;
+    padding: 9px 10px;
+  }
+
+  .content-section,
+  .filter-bar,
+  .japan-explore-toolbar {
+    border-radius: 10px;
+  }
+
+  .discovery-hero,
+  .japan-explore-hero {
+    padding: 14px;
+  }
+
+  .discovery-hero h2,
+  .japan-explore-hero h2 {
+    max-width: 22ch;
   }
 }
