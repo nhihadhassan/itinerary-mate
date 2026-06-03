@@ -1,7 +1,7 @@
-export type TripId = "japan-2026" | "peru-2026";
-export type TripCurrency = "JPY" | "CAD" | "PEN" | "USD";
+export type TripId = "japan-2026" | "peru-2026" | "portugal-2026";
+export type TripCurrency = "JPY" | "CAD" | "PEN" | "USD" | "EUR";
 export type TripActivityType = "activity" | "food" | "hotel" | "flight" | "transport" | "note";
-export type TripSource = "japan-default" | "Wanderlog" | "Wanderlog PDF" | "Google Doc" | "manual" | "placeholder" | "needs confirmation";
+export type TripSource = "japan-default" | "Wanderlog" | "Wanderlog PDF" | "Google Doc" | "Google Doc PDF" | "manual" | "placeholder" | "needs confirmation";
 export type CostStatus = "imported" | "converted-estimate" | "needs-confirmation" | "manual";
 export type BookingStatus = "booked" | "not-booked" | "optional" | "needs-confirmation";
 export type TripCategory =

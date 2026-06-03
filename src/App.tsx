@@ -53,6 +53,7 @@ import {
   tripAnchors,
 } from "./japanItinerary";
 import { peruDayRouteSummaries, peruRouteSuggestions, peruTrip } from "./peruItinerary";
+import { portugalDayRouteSummaries, portugalRegionCalendar, portugalRouteSuggestions, portugalTrip } from "./portugalItinerary";
 import { japanExploreKinds, japanExplorePlaces } from "./japanExplore";
 import type { JapanExploreKind, JapanExplorePlace } from "./japanExplore";
 import { discoveryKinds, discoveryPlaces, discoveryWindows } from "./discoveryPlaces";
@@ -97,7 +98,9 @@ const MULTI_STORAGE_KEY = "itinerary-mate-v2";
 const LEGACY_JAPAN_STORAGE_KEY = "september-japan-planner-v1";
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 let googleMapsLoader: Promise<any> | null = null;
-const tripOrder: TripId[] = ["japan-2026", "peru-2026"];
+const tripOrder: TripId[] = ["japan-2026", "peru-2026", "portugal-2026"];
+const calendarTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
+const bookedTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
 
 const baseNavItems: Array<{ id: AppView; label: string }> = [
   { id: "dashboard", label: "Overview" },
@@ -351,6 +354,7 @@ function defaultState(): MultiTripState {
     trips: {
       "japan-2026": buildJapanTrip(legacy?.activities || defaultActivities, legacy?.stayAreas || defaultStayAreas),
       "peru-2026": peruTrip,
+      "portugal-2026": portugalTrip,
     },
     japanBranch,
     japanCadToJpy: legacy?.cadToJpy || DEFAULT_CAD_TO_JPY,
@@ -373,6 +377,7 @@ function loadState(): MultiTripState {
     trips: {
       "japan-2026": mergeTrip(defaults.trips["japan-2026"], stored.trips["japan-2026"]),
       "peru-2026": mergeTrip(peruTrip, stored.trips["peru-2026"]),
+      "portugal-2026": mergeTrip(portugalTrip, stored.trips["portugal-2026"]),
     },
   };
 }
@@ -400,6 +405,11 @@ function formatMoney(value: number, currency: string, localPerCad = DEFAULT_CAD_
     const cad = `CAD ${new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Math.round(value / localPerCad))}`;
     return `PEN ${pen} (${cad})`;
   }
+  if (currency === "EUR") {
+    const eur = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(Math.round(value));
+    const cad = `CAD ${new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Math.round(value / localPerCad))}`;
+    return `EUR ${eur} (${cad})`;
+  }
   return new Intl.NumberFormat("en-CA", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
 }
 
@@ -408,7 +418,8 @@ function formatCadOnly(value: number, localPerCad: number) {
 }
 
 function formatLocalOnly(value: number, currency: string) {
-  return new Intl.NumberFormat(currency === "PEN" ? "es-PE" : "ja-JP", { style: "currency", currency, maximumFractionDigits: 0 }).format(Math.round(value));
+  const locale = currency === "PEN" ? "es-PE" : currency === "EUR" ? "de-DE" : "ja-JP";
+  return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: currency === "EUR" ? 2 : 0 }).format(currency === "EUR" ? value : Math.round(value));
 }
 
 function formatLocalApprox(value: number, currency: string) {
@@ -446,6 +457,12 @@ function activityStatusLabel(activity: TripActivity) {
 
 function routeTimeLabel(activity: TripActivity) {
   return activity.routeLegEstimate || activity.travelTimeFromPrevious || "";
+}
+
+function tripDayRouteSummary(trip: Trip, day: number) {
+  if (trip.id === "peru-2026") return peruDayRouteSummaries[day] || "";
+  if (trip.id === "portugal-2026") return portugalDayRouteSummaries[day] || "";
+  return "";
 }
 
 function cleanUiText(text = "") {
@@ -593,7 +610,7 @@ function App() {
   const activeTrip = state.trips[state.activeTripId];
   const activeNavItems = useMemo(
     () =>
-      activeTrip.id === "peru-2026"
+      calendarTripIds.has(activeTrip.id)
         ? baseNavItems.flatMap((item) => (item.id === "itinerary" ? [item, { id: "calendar" as AppView, label: "Calendar" }] : [item]))
         : baseNavItems,
     [activeTrip.id],
@@ -905,7 +922,7 @@ function App() {
 
   function resetActiveTrip() {
     if (!window.confirm(`Reset ${activeTrip.title} back to default data?`)) return;
-    const nextTrip = activeTrip.id === "japan-2026" ? buildJapanTrip() : peruTrip;
+    const nextTrip = activeTrip.id === "japan-2026" ? buildJapanTrip() : activeTrip.id === "peru-2026" ? peruTrip : portugalTrip;
     setState((current) => ({
       ...current,
       trips: { ...current.trips, [activeTrip.id]: nextTrip },
@@ -933,17 +950,17 @@ function App() {
   }
 
   const isJapanExploreView = activeTrip.id === "japan-2026" && activeView === "places";
-  const isPeruCalendarView = activeTrip.id === "peru-2026" && activeView === "calendar";
+  const isTripCalendarView = calendarTripIds.has(activeTrip.id) && activeView === "calendar";
   const isDiscoveryView = activeView === "discovery";
 
   return (
-    <div className={`app-shell trip-${activeTrip.id === "peru-2026" ? "peru" : "japan"}`}>
+    <div className={`app-shell trip-${activeTrip.id === "peru-2026" ? "peru" : activeTrip.id === "portugal-2026" ? "portugal" : "japan"}`}>
       <header className="topbar">
         <a className="skip-link" href="#main-content">Skip to itinerary</a>
         <div className="brand-block">
           <p className="eyebrow">Local-first travel command center</p>
           <h1>Itinerary Mate</h1>
-          {activeTrip.id !== "peru-2026" && <p>{activeTrip.description}</p>}
+          {!bookedTripIds.has(activeTrip.id) && <p>{activeTrip.description}</p>}
         </div>
         <div className="topbar-actions">
           <TripSwitcher activeTripId={state.activeTripId} setActiveTripId={(activeTripId) => updateState({ activeTripId })} />
@@ -968,7 +985,7 @@ function App() {
         ))}
       </nav>
 
-      {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !isJapanExploreView && !isPeruCalendarView && !isDiscoveryView && (
+      {!(bookedTripIds.has(activeTrip.id) && activeView === "dashboard") && !isJapanExploreView && !isTripCalendarView && !isDiscoveryView && (
         <DayRail
           days={days}
           activities={allVisibleActivities}
@@ -979,8 +996,8 @@ function App() {
         />
       )}
 
-      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${(isJapanExploreView || isPeruCalendarView || isDiscoveryView) ? "explore-main-grid" : ""}`}>
-        {!isJapanExploreView && !isPeruCalendarView && !isDiscoveryView && <aside className="side-panel">
+      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${(isJapanExploreView || isTripCalendarView || isDiscoveryView) ? "explore-main-grid" : ""}`}>
+        {!isJapanExploreView && !isTripCalendarView && !isDiscoveryView && <aside className="side-panel">
           {activeTrip.id === "japan-2026" && (
             <section className="card route-card">
               <div className="section-heading">
@@ -1012,7 +1029,7 @@ function App() {
             )}
           </section>
 
-          {activeTrip.id === "peru-2026" && <PeruRegionCalendar startDate={activeTrip.startDate} compact />}
+          {bookedTripIds.has(activeTrip.id) && <TripRegionCalendar trip={activeTrip} compact />}
 
           {activeTrip.id === "japan-2026" && <section className="card quick-card">
             <p className="eyebrow">Offline</p>
@@ -1022,7 +1039,7 @@ function App() {
         </aside>}
 
         <div className="content-stack">
-          {!(activeTrip.id === "peru-2026" && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && !isPeruCalendarView && !isDiscoveryView && (
+          {!(bookedTripIds.has(activeTrip.id) && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && !isTripCalendarView && !isDiscoveryView && (
             <FilterBar
               query={query}
               setQuery={setQuery}
@@ -1076,8 +1093,8 @@ function App() {
             </div>
           )}
 
-          {activeView === "calendar" && activeTrip.id === "peru-2026" && (
-            <PeruCalendar
+          {activeView === "calendar" && calendarTripIds.has(activeTrip.id) && (
+            <TripCalendar
               trip={activeTrip}
               activities={allVisibleActivities}
               exchangeRate={activeExchangeRate}
@@ -1180,7 +1197,7 @@ function makeBudget(trip: Trip, activities: TripActivity[]) {
 }
 
 function makeRouteSuggestions(trip: Trip, activities: TripActivity[]): RouteSuggestion[] {
-  const suggestions: RouteSuggestion[] = trip.id === "peru-2026" ? [...peruRouteSuggestions] : [];
+  const suggestions: RouteSuggestion[] = trip.id === "peru-2026" ? [...peruRouteSuggestions] : trip.id === "portugal-2026" ? [...portugalRouteSuggestions] : [];
   const grouped = activities.reduce<Record<number, TripActivity[]>>((acc, activity) => {
     acc[activity.day] ||= [];
     acc[activity.day].push(activity);
@@ -1224,11 +1241,16 @@ function makeRouteSuggestions(trip: Trip, activities: TripActivity[]): RouteSugg
 }
 
 function TripSwitcher({ activeTripId, setActiveTripId }: { activeTripId: TripId; setActiveTripId: (id: TripId) => void }) {
+  const labels: Record<TripId, string> = {
+    "japan-2026": "Japan Trip",
+    "peru-2026": "Peru Trip",
+    "portugal-2026": "Portugal Trip",
+  };
   return (
     <div className="trip-switcher" aria-label="Trip switcher">
       {tripOrder.map((tripId) => (
         <button key={tripId} type="button" className={activeTripId === tripId ? "active" : ""} onClick={() => setActiveTripId(tripId)}>
-          {tripId === "japan-2026" ? "Japan Trip" : "Peru Trip"}
+          {labels[tripId]}
         </button>
       ))}
     </div>
@@ -1325,9 +1347,9 @@ function FilterBar(props: {
   addRestDay: () => void;
   tripId: TripId;
 }) {
-  const isPeru = props.tripId === "peru-2026";
+  const isBookedTrip = bookedTripIds.has(props.tripId);
   return (
-    <section className={`filter-bar ${isPeru ? "peru-filter-bar" : ""}`} aria-label="Trip filters">
+    <section className={`filter-bar ${isBookedTrip ? "peru-filter-bar" : ""}`} aria-label="Trip filters">
       <label className="search-field">
         <Search size={18} aria-hidden="true" />
         <input value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="Search places, notes, addresses" />
@@ -1339,7 +1361,7 @@ function FilterBar(props: {
           </button>
         ))}
       </div>
-      {!isPeru && <div className="filter-selects">
+      {!isBookedTrip && <div className="filter-selects">
         <label className="field">
           <span>City</span>
           <select value={props.selectedCity} onChange={(event) => props.setSelectedCity(event.target.value)}>
@@ -1365,13 +1387,13 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
   const nextFlight = trip.flights.find((flight) => new Date(flight.departureTime).getTime() >= Date.now()) || trip.flights[0];
   const nextHotel = trip.hotels[0];
   const totalDays = Math.max(...activities.map((activity) => activity.day), 1);
-  if (trip.id === "peru-2026") {
+  if (bookedTripIds.has(trip.id)) {
     return (
       <section className="content-section peru-overview">
         <div className="section-heading">
           <div>
             <p className="eyebrow">{formatDate(trip.startDate)} to {formatDate(trip.endDate)}</p>
-            <h2>Peru Trip</h2>
+            <h2>{trip.title}</h2>
           </div>
           <div className="button-row">
             <button className="ghost-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(2)")?.click()}>
@@ -1389,8 +1411,8 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
           <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
         </div>
         <div className="peru-overview-feature-grid">
-          <PeruDestinationMap activities={activities} />
-          <PeruImageSlideshow activities={activities} />
+          <TripDestinationMap trip={trip} activities={activities} />
+          <TripImageSlideshow trip={trip} activities={activities} />
         </div>
         <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
       </section>
@@ -1423,12 +1445,21 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
             </article>
           ))}
         </div>
-      ) : (
+      ) : trip.id === "peru-2026" ? (
         <div className="overview-grid">
           {["Altitude first", "Sacred Valley", "Machu Picchu", "Arequipa and Colca", "Coast reset", "Lima buffer"].map((title) => (
             <article className="anchor-card" key={title}>
               <h3>{title}</h3>
               <p>{peruAnchorCopy(title)}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="overview-grid">
+          {["Lisbon soft start", "Algarve reset", "Sintra together", "Porto and Douro"].map((title) => (
+            <article className="anchor-card" key={title}>
+              <h3>{title}</h3>
+              <p>{portugalAnchorCopy(title)}</p>
             </article>
           ))}
         </div>
@@ -1450,21 +1481,33 @@ const peruRegionCalendar = [
   { startDay: 15, endDay: 16, region: "Lima" },
 ];
 
-function PeruRegionCalendar({ startDate, compact = false }: { startDate?: string; compact?: boolean }) {
-  const regions = Array.from(new Set(peruRegionCalendar.map((item) => item.region)));
-  const monthDays = Array.from({ length: 31 }, (_, index) => index + 1);
-  const firstDayOffset = 3; // July 1, 2026 is a Wednesday.
-  const calendarSegments = peruRegionCalendar.flatMap((item) => getRegionCalendarSegments(item.startDay, item.endDay, startDate).map((segment, index) => ({ ...item, ...segment, segmentId: `${item.region}-${item.startDay}-${index}` })));
+function tripRegionCalendar(trip: Trip) {
+  if (trip.id === "portugal-2026") return portugalRegionCalendar;
+  return peruRegionCalendar;
+}
+
+function TripRegionCalendar({ trip, compact = false }: { trip: Trip; compact?: boolean }) {
+  const regionCalendar = tripRegionCalendar(trip);
+  const regions = Array.from(new Set(regionCalendar.map((item) => item.region)));
+  const baseDate = trip.startDate || "2026-07-01";
+  const monthDate = new Date(`${baseDate}T12:00:00`);
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1, 12);
+  const monthLength = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+  const monthDays = Array.from({ length: monthLength }, (_, index) => index + 1);
+  const firstDayOffset = monthStart.getDay();
+  const monthLabel = new Intl.DateTimeFormat("en-CA", { month: "long", year: "numeric" }).format(monthStart);
+  const calendarSegments = regionCalendar.flatMap((item) => getRegionCalendarSegments(item.startDay, item.endDay, trip.startDate).map((segment, index) => ({ ...item, ...segment, segmentId: `${item.region}-${item.startDay}-${index}` })));
+  const totalTripDays = Math.max(1, Math.round((new Date(`${trip.endDate || baseDate}T12:00:00`).getTime() - new Date(`${baseDate}T12:00:00`).getTime()) / 86400000) + 1);
   return (
     <article className={`overview-region-calendar ${compact ? "compact-region-calendar" : ""}`}>
       <div className="section-heading compact-heading">
         <div>
-          <p className="eyebrow">July 2026</p>
+          <p className="eyebrow">{monthLabel}</p>
           <h2>{compact ? "Where we are" : "Where we are each day"}</h2>
         </div>
         <CalendarDays size={20} aria-hidden="true" />
       </div>
-      <div className="region-month-calendar" aria-label="Peru July 2026 region calendar">
+      <div className="region-month-calendar" aria-label={`${trip.title} region calendar`}>
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((weekday) => (
           <span className="region-month-weekday" key={weekday}>{weekday}</span>
         ))}
@@ -1473,7 +1516,8 @@ function PeruRegionCalendar({ startDate, compact = false }: { startDate?: string
             const gridIndex = day + firstDayOffset;
             const row = Math.floor((gridIndex - 1) / 7) + 1;
             const column = ((gridIndex - 1) % 7) + 1;
-            const isTripDay = day >= 11 && day <= 26;
+            const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), day, 12).toISOString().slice(0, 10);
+            const isTripDay = Boolean(trip.startDate && trip.endDate && date >= trip.startDate && date <= trip.endDate);
             return (
               <div
                 key={day}
@@ -1485,8 +1529,8 @@ function PeruRegionCalendar({ startDate, compact = false }: { startDate?: string
             );
           })}
           {calendarSegments.map((item) => {
-            const startDateLabel = dateForTripDay(startDate, item.startDay);
-            const endDateLabel = dateForTripDay(startDate, item.endDay);
+            const startDateLabel = dateForTripDay(trip.startDate, item.startDay);
+            const endDateLabel = dateForTripDay(trip.startDate, item.endDay);
             const ariaLabel = `${item.region}, ${startDateLabel ? formatCalendarDate(startDateLabel) : `day ${item.startDay}`} to ${endDateLabel ? formatCalendarDate(endDateLabel) : `day ${item.endDay}`}`;
             return (
               <div
@@ -1503,11 +1547,11 @@ function PeruRegionCalendar({ startDate, compact = false }: { startDate?: string
         </div>
       </div>
       {!compact && (
-        <div className="region-calendar-grid" aria-label="Peru region calendar by trip day">
-          {Array.from({ length: 16 }, (_, index) => {
+        <div className="region-calendar-grid" aria-label={`${trip.country} region calendar by trip day`}>
+          {Array.from({ length: totalTripDays }, (_, index) => {
             const day = index + 1;
-            const region = peruRegionCalendar.find((item) => day >= item.startDay && day <= item.endDay)?.region || "Peru";
-            const date = dateForTripDay(startDate, day);
+            const region = regionCalendar.find((item) => day >= item.startDay && day <= item.endDay)?.region || trip.country;
+            const date = dateForTripDay(trip.startDate, day);
           return (
             <div key={day} className={`region-day region-${region.toLowerCase().replace(/\s+/g, "-")}`}>
               <span>Day {day}</span>
@@ -1535,7 +1579,9 @@ function getRegionCalendarSegments(startDay: number, endDay: number, tripStartDa
   while (cursor <= endDay) {
     const date = dateForTripDay(tripStartDate, cursor);
     const dateObject = date ? new Date(`${date}T12:00:00`) : undefined;
-    const weekRow = dateObject ? Math.floor((dateObject.getDate() + 3 - 1) / 7) + 1 : 1;
+    const monthStart = dateObject ? new Date(dateObject.getFullYear(), dateObject.getMonth(), 1, 12) : undefined;
+    const firstDayOffset = monthStart?.getDay() || 0;
+    const weekRow = dateObject ? Math.floor((dateObject.getDate() + firstDayOffset - 1) / 7) + 1 : 1;
     const startCol = dateObject ? dateObject.getDay() + 1 : 1;
     const daysLeftInWeek = 8 - startCol;
     const segmentLength = Math.min(daysLeftInWeek, endDay - cursor + 1);
@@ -1762,7 +1808,7 @@ function downloadTripIcs(trip: Trip, events: TripCalendarEvent[]) {
   URL.revokeObjectURL(url);
 }
 
-function PeruCalendar({ trip, activities, exchangeRate, openItineraryDay }: { trip: Trip; activities: TripActivity[]; exchangeRate: number; openItineraryDay: (day: number) => void }) {
+function TripCalendar({ trip, activities, exchangeRate, openItineraryDay }: { trip: Trip; activities: TripActivity[]; exchangeRate: number; openItineraryDay: (day: number) => void }) {
   const tripDates = useMemo(() => enumerateDates(trip.startDate, trip.endDate), [trip.endDate, trip.startDate]);
   const [selectedDate, setSelectedDate] = useState(trip.startDate || tripDates[0] || "");
   const events = useMemo(() => makeCalendarEvents(trip, activities, exchangeRate), [activities, exchangeRate, trip]);
@@ -1793,7 +1839,7 @@ function PeruCalendar({ trip, activities, exchangeRate, openItineraryDay }: { tr
       <div className="calendar-hero">
         <div>
           <p className="eyebrow">Booked trip calendar</p>
-          <h2>Peru schedule at a glance</h2>
+          <h2>{trip.country} schedule at a glance</h2>
           <p>Flights, stays, route days, costs, and flexible stops in one place.</p>
         </div>
         <div className="calendar-actions">
@@ -1822,11 +1868,11 @@ function PeruCalendar({ trip, activities, exchangeRate, openItineraryDay }: { tr
       </div>
 
       <div className="calendar-layout">
-        <section className="month-card" aria-label="July 2026 calendar">
+        <section className="month-card" aria-label={`${trip.title} calendar`}>
           <div className="section-heading compact-heading">
             <div>
               <p className="eyebrow">Month view</p>
-              <h3>July 2026</h3>
+              <h3>{new Intl.DateTimeFormat("en-CA", { month: "long", year: "numeric" }).format(new Date(`${trip.startDate || selectedDate || "2026-07-01"}T12:00:00`))}</h3>
             </div>
             <span>{events.length} calendar items</span>
           </div>
@@ -1901,7 +1947,7 @@ function PeruCalendar({ trip, activities, exchangeRate, openItineraryDay }: { tr
               ))}
             </div>
           ) : (
-            <EmptyState title="Nothing scheduled" body="This date is outside the imported Peru plan or has no saved items yet." />
+            <EmptyState title="Nothing scheduled" body={`This date is outside the imported ${trip.country} plan or has no saved items yet.`} />
           )}
         </aside>
       </div>
@@ -1909,10 +1955,10 @@ function PeruCalendar({ trip, activities, exchangeRate, openItineraryDay }: { tr
   );
 }
 
-function PeruDestinationMap({ activities }: { activities: TripActivity[] }) {
-  const peruvianStops = activities
+function TripDestinationMap({ trip, activities }: { trip: Trip; activities: TripActivity[] }) {
+  const destinationStops = activities
     .filter((activity) =>
-      activity.country === "Peru" &&
+      activity.country === trip.country &&
       activity.latitude !== undefined &&
       activity.longitude !== undefined &&
       activity.type !== "flight" &&
@@ -1923,11 +1969,11 @@ function PeruDestinationMap({ activities }: { activities: TripActivity[] }) {
     .filter((activity, index, list) => list.findIndex((item) => item.title === activity.title && item.city === activity.city) === index)
     .slice(0, 24);
 
-  if (!peruvianStops.length) {
-    return <EmptyState title="No Peru map pins yet" body="Peru destinations with saved coordinates will appear here." />;
+  if (!destinationStops.length) {
+    return <EmptyState title={`No ${trip.country} map pins yet`} body={`${trip.country} destinations with saved coordinates will appear here.`} />;
   }
 
-  const bounds = peruvianStops.reduce(
+  const bounds = destinationStops.reduce(
     (acc, activity) => ({
       minLat: Math.min(acc.minLat, activity.latitude!),
       maxLat: Math.max(acc.maxLat, activity.latitude!),
@@ -1961,7 +2007,7 @@ function PeruDestinationMap({ activities }: { activities: TripActivity[] }) {
       height: `${100 / tileRows}%`,
     };
   });
-  const pins = peruvianStops.map((activity, index) => {
+  const pins = destinationStops.map((activity, index) => {
     const projectedX = longitudeToTileX(activity.longitude!, zoom);
     const projectedY = latitudeToTileY(activity.latitude!, zoom);
     return {
@@ -1977,10 +2023,10 @@ function PeruDestinationMap({ activities }: { activities: TripActivity[] }) {
     <article className="overview-map-card">
       <div className="map-panel-header">
         <div>
-          <p className="eyebrow">Peru map</p>
-          <h2>Destinations in Peru</h2>
+          <p className="eyebrow">{trip.country} map</p>
+          <h2>Destinations in {trip.country}</h2>
         </div>
-        <span>{peruvianStops.length} pins</span>
+        <span>{destinationStops.length} pins</span>
       </div>
       <div className="map-canvas overview-map-canvas">
         <div className="map-tiles" aria-hidden="true">
@@ -2000,19 +2046,19 @@ function PeruDestinationMap({ activities }: { activities: TripActivity[] }) {
           </button>
         ))}
       </div>
-      <p className="quiet-note">Only Peru stops are shown here. Canada, Mexico, and flight connection points are intentionally excluded.</p>
+      <p className="quiet-note">Only {trip.country} stops are shown here. International flight connection points are intentionally excluded.</p>
     </article>
   );
 }
 
-function PeruImageSlideshow({ activities }: { activities: TripActivity[] }) {
+function TripImageSlideshow({ trip, activities }: { trip: Trip; activities: TripActivity[] }) {
   const slides = useMemo(
     () =>
       activities
-        .filter((activity) => activity.country === "Peru" && isImageUrl(activity.imageUrl) && activity.type !== "flight" && activity.category !== "Flight")
+        .filter((activity) => activity.country === trip.country && isImageUrl(activity.imageUrl) && activity.type !== "flight" && activity.category !== "Flight")
         .filter((activity, index, list) => list.findIndex((item) => item.title === activity.title) === index)
         .slice(0, 10),
-    [activities],
+    [activities, trip.country],
   );
   const [slideIndex, setSlideIndex] = useState(0);
 
@@ -2023,7 +2069,7 @@ function PeruImageSlideshow({ activities }: { activities: TripActivity[] }) {
   }, [slides.length]);
 
   if (!slides.length) {
-    return <EmptyState title="No destination photos yet" body="Real Peru place images will appear here when available." />;
+    return <EmptyState title="No destination photos yet" body={`Real ${trip.country} place images will appear here when available.`} />;
   }
 
   const active = slides[slideIndex % slides.length];
@@ -2107,6 +2153,16 @@ function peruAnchorCopy(title: string) {
   return copy[title];
 }
 
+function portugalAnchorCopy(title: string) {
+  const copy: Record<string, string> = {
+    "Lisbon soft start": "Solo Lisbon first, then Lisbon together after Rachel lands. Keep the arrival days light.",
+    "Algarve reset": "Lagos is the beach and hostel-social stretch. Protect Ponta da Piedade and one adventure day.",
+    "Sintra together": "Regaleira plus Monserrate is the calmer couple plan. Pena stays optional.",
+    "Porto and Douro": "Porto gets the anniversary feel; Douro is the long scenic day to book early.",
+  };
+  return copy[title];
+}
+
 function MetricCard({ label, value, detail, icon }: { label: string; value: string; detail: string; icon: ReactNode }) {
   return (
     <article className="metric-card">
@@ -2133,13 +2189,13 @@ function ItineraryTimeline(props: {
   exchangeRate: number;
 }) {
   return (
-    <section className={`timeline content-section ${props.trip.id === "peru-2026" ? "wanderlog-timeline" : ""}`}>
+    <section className={`timeline content-section ${bookedTripIds.has(props.trip.id) ? "wanderlog-timeline" : ""}`}>
       {props.days.map((day) => {
         const dayActivities = props.activities.filter((activity) => activity.day === day);
         const pacing = dayScore(dayActivities);
         const routeSummary =
-          props.trip.id === "peru-2026"
-            ? peruDayRouteSummaries[day]
+          bookedTripIds.has(props.trip.id)
+            ? tripDayRouteSummary(props.trip, day)
             : dayActivities.map((activity) => activity.city).filter(Boolean).filter((city, index, list) => list.indexOf(city) === index).join(" -> ");
         return (
           <DayDropZone key={day} day={day}>
@@ -2148,7 +2204,7 @@ function ItineraryTimeline(props: {
               <div>
                 <p className="eyebrow">Day {day}</p>
                 <h2>{dayActivities[0]?.city || "Open day"}</h2>
-                {props.trip.id === "peru-2026" && dayActivities.length > 0 && <span className="route-summary">{routeSummary || "Route needs confirmation"}</span>}
+                {bookedTripIds.has(props.trip.id) && dayActivities.length > 0 && <span className="route-summary">{routeSummary || "Route needs confirmation"}</span>}
               </div>
               <div className="day-meta">
                 <span className={`pacing-pill ${pacing.tone}`}>{pacing.label}</span>
@@ -2767,7 +2823,7 @@ function pinKind(activity: TripActivity) {
 }
 
 function isLongDistanceTransitDay(trip: Trip, activities: TripActivity[], selectedDay: number | "All") {
-  if (trip.id !== "peru-2026") return false;
+  if (!bookedTripIds.has(trip.id)) return false;
   const countries = new Set(activities.map((activity) => activity.country).filter(Boolean));
   const transitStops = activities.filter((activity) => activity.type === "flight" || activity.type === "transport" || activity.category === "Flight" || activity.category === "Transit");
   const coordinates = activities.filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined);
@@ -2999,7 +3055,7 @@ function GoogleRouteMapPanel({ stops, coordinateStops, dayLabel }: { stops: Trip
 }
 
 function TransitRoutePanel({ trip, stops, selectedDay, dayLabel }: { trip: Trip; stops: TripActivity[]; selectedDay: number | "All"; dayLabel: string }) {
-  const routeSummary = typeof selectedDay === "number" ? peruDayRouteSummaries[selectedDay] : "";
+  const routeSummary = typeof selectedDay === "number" ? tripDayRouteSummary(trip, selectedDay) : "";
   return (
     <aside className="map-panel transit-panel" aria-label={`${trip.title} transit route`}>
       <div className="map-panel-header">
@@ -3460,6 +3516,7 @@ function ImportPanel({ trip, replaceActiveTrip }: { trip: Trip; replaceActiveTri
   const [backupText, setBackupText] = useState("");
   const [message, setMessage] = useState("Pasted data is preview-only until you explicitly apply a JSON backup.");
   const isPeru = trip.id === "peru-2026";
+  const isPortugal = trip.id === "portugal-2026";
 
   function previewPaste() {
     const wanderlogLines = wanderlogText.split(/\r?\n/).filter((line) => line.trim()).length;
@@ -3483,7 +3540,7 @@ function ImportPanel({ trip, replaceActiveTrip }: { trip: Trip; replaceActiveTri
         setMessage(`This backup is for ${parsed.id || "another trip"}, not ${trip.id}.`);
         return;
       }
-      const expectedCurrency = trip.id === "peru-2026" ? "PEN" : "JPY";
+      const expectedCurrency = trip.currency;
       const importedCurrencies = [
         parsed.currency,
         parsed.currencyConfig?.localCurrency,
@@ -3527,6 +3584,12 @@ function ImportPanel({ trip, replaceActiveTrip }: { trip: Trip; replaceActiveTri
         <div className="source-note">
           <h3>Peru source status</h3>
           <p>Public Wanderlog state plus the local Wanderlog PDF are imported: 55 dated cards, exact PDF route-leg timings, 16 daily route summaries, 4 flights, 10 lodging blocks, 2 train/transit blocks, and 19 CAD expenses. Add more Google Doc notes here only if the doc changes later.</p>
+        </div>
+      )}
+      {isPortugal && (
+        <div className="source-note">
+          <h3>Portugal source status</h3>
+          <p>The Google Docs PDF and Wanderlog PDF are imported: 17 dated days, booked flights, booked lodging, Wanderlog route timing text, CAD/EUR expenses, Portugal map rows, and the remaining booking checklist.</p>
         </div>
       )}
 

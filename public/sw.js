@@ -1,4 +1,4 @@
-const CACHE_NAME = "itinerary-mate-core-v3-20260520";
+const CACHE_NAME = "itinerary-mate-core-v4-20260603";
 const CORE_ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

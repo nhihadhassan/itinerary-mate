@@ -4,6 +4,7 @@ Itinerary Mate is a local-first multi-trip itinerary tracker built with Vite, Re
 
 - Japan Trip: the original September 1-30, 2026 planner with JPY source budgets and CAD comparison.
 - Peru Trip: a July 11-26, 2026 Wanderlog import enriched from the local Wanderlog PDF, with 55 dated cards, exact route-leg timing text, 16 daily route summaries, 4 flights, 10 lodging blocks, 2 train/transit blocks, 19 imported CAD expenses, and PEN + CAD planning displays.
+- Portugal Trip: a June 8-24, 2026 mainland Portugal plan imported from the local Google Docs PDF and Wanderlog PDF, with Lisbon, Lagos, Sintra, Porto, Douro Valley, booked flights, booked lodging, route timing text, map rows, calendar view, and EUR + CAD budgeting.
 
 The app is designed as a travel command center: editable cards, budget dashboards, lodging and flight tracking, attachment placeholders, route suggestions, Google Maps export, CSV export, dark mode, and offline-ready PWA basics.
 
@@ -43,6 +44,7 @@ pnpm preview
 - `src/App.tsx`: multi-trip app shell, localStorage migration, trip switcher, dashboards, exports, logistics, dark mode, and editing UI.
 - `src/japanItinerary.ts`: Japan source itinerary and original budget route data.
 - `src/peruItinerary.ts`: Peru trip seed data, flights, hotels, attachments, and route suggestions.
+- `src/portugalItinerary.ts`: Portugal trip seed data from the Google Docs PDF and Wanderlog PDF, including flights, hotels, activities, attachments, route summaries, and region calendar blocks.
 - `src/tripTypes.ts`: shared trip, activity, flight, hotel, attachment, and route suggestion types.
 - `src/importTemplates/peruWanderlogTemplate.ts`: paste-ready format for adding more Peru details from Wanderlog, Google Docs, emails, or notes.
 - `public/manifest.webmanifest`, `public/sw.js`, `public/icon.svg`: installable PWA shell and core asset caching.
@@ -66,7 +68,9 @@ Keep private documents out of localStorage. Attachment records are metadata only
 
 - Japan uses JPY as the source currency and CAD as the comparison currency.
 - Peru uses PEN as the local trip currency and CAD as the comparison currency.
+- Portugal uses EUR as the local trip currency and CAD as the comparison currency.
 - Peru's public Wanderlog expenses were imported in CAD, then converted to rough PEN using the editable planning rate `1 CAD = 2.5 PEN`.
+- Portugal's booked lodging was imported in EUR. Flight/activity expenses from Wanderlog that were listed in CAD are converted to rough EUR using the editable planning rate `1 CAD = 0.65 EUR`.
 - Exchange rates are planning estimates, not live financial quotes.
 
 ## Offline And PWA Notes

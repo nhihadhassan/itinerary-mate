@@ -158,6 +158,16 @@ img {
   --blue-soft: #e2eff1;
 }
 
+.app-shell.trip-portugal {
+  --trip-accent: #2f6f79;
+  --trip-accent-2: #dcecef;
+  --trip-warm: #d28b4f;
+  --green: #356d59;
+  --green-2: #e2ece5;
+  --blue: #326d82;
+  --blue-soft: #e1eff3;
+}
+
 :root[data-theme="dark"] .app-shell.trip-peru {
   --trip-accent: #e0c07d;
   --trip-accent-2: #362f21;
@@ -166,6 +176,16 @@ img {
   --green-2: #263423;
   --blue: #a7d2de;
   --blue-soft: #1d3034;
+}
+
+:root[data-theme="dark"] .app-shell.trip-portugal {
+  --trip-accent: #9acfd8;
+  --trip-accent-2: #1e3438;
+  --trip-warm: #e3a56f;
+  --green: #a9cbb8;
+  --green-2: #22372e;
+  --blue: #a7d4e2;
+  --blue-soft: #1d3138;
 }
 
 .skip-link {
@@ -2580,29 +2600,35 @@ img {
 }
 
 /* Peru simplification pass: keep the imported trip useful, but far quieter. */
-.trip-peru .quick-card {
+.trip-peru .quick-card,
+.trip-portugal .quick-card {
   gap: 4px;
 }
 
-.trip-peru .quick-card strong {
+.trip-peru .quick-card strong,
+.trip-portugal .quick-card strong {
   font-size: clamp(1.8rem, 4vw, 2.45rem);
   letter-spacing: 0;
 }
 
-.trip-peru .quick-card span {
+.trip-peru .quick-card span,
+.trip-portugal .quick-card span {
   font-size: 0.95rem;
 }
 
-.trip-peru .peru-filter-bar {
+.trip-peru .peru-filter-bar,
+.trip-portugal .peru-filter-bar {
   grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.1fr);
   align-items: center;
 }
 
-.trip-peru .day-chip {
+.trip-peru .day-chip,
+.trip-portugal .day-chip {
   min-width: 112px;
 }
 
-.trip-peru .day-rail {
+.trip-peru .day-rail,
+.trip-portugal .day-rail {
   position: relative;
   top: auto;
   z-index: 2;
@@ -2610,7 +2636,8 @@ img {
   padding-bottom: 6px;
 }
 
-.trip-peru .day-chip em {
+.trip-peru .day-chip em,
+.trip-portugal .day-chip em {
   display: none;
 }
 
@@ -2831,6 +2858,34 @@ img {
   --region-color: #4f92a8;
 }
 
+.region-flight {
+  --region-color: #5b7fa4;
+}
+
+.region-lisbon {
+  --region-color: #3e7a69;
+}
+
+.region-lagos {
+  --region-color: #4d91a6;
+}
+
+.region-sintra {
+  --region-color: #7b8f4b;
+}
+
+.region-transfer {
+  --region-color: #b77a46;
+}
+
+.region-porto {
+  --region-color: #3f6f9e;
+}
+
+.region-douro-valley {
+  --region-color: #9a7b36;
+}
+
 .region-calendar-legend {
   display: flex;
   flex-wrap: wrap;
@@ -2988,21 +3043,28 @@ img {
 }
 
 .trip-peru .itinerary-card.no-real-image,
-.trip-peru .browser-grid .place-card.no-real-image {
+.trip-portugal .itinerary-card.no-real-image,
+.trip-peru .browser-grid .place-card.no-real-image,
+.trip-portugal .browser-grid .place-card.no-real-image {
   grid-template-columns: minmax(0, 1fr);
 }
 
 .trip-peru .itinerary-card.no-real-image .card-image,
-.trip-peru .browser-grid .place-card.no-real-image .card-image {
+.trip-portugal .itinerary-card.no-real-image .card-image,
+.trip-peru .browser-grid .place-card.no-real-image .card-image,
+.trip-portugal .browser-grid .place-card.no-real-image .card-image {
   display: none;
 }
 
 .trip-peru .itinerary-card.no-real-image .card-body,
-.trip-peru .browser-grid .place-card.no-real-image .card-body {
+.trip-portugal .itinerary-card.no-real-image .card-body,
+.trip-peru .browser-grid .place-card.no-real-image .card-body,
+.trip-portugal .browser-grid .place-card.no-real-image .card-body {
   padding: 2px;
 }
 
-.trip-peru .itinerary-card.no-real-image .meta-chips span:nth-child(n + 4) {
+.trip-peru .itinerary-card.no-real-image .meta-chips span:nth-child(n + 4),
+.trip-portugal .itinerary-card.no-real-image .meta-chips span:nth-child(n + 4) {
   display: none;
 }
 
@@ -3305,7 +3367,8 @@ img {
 }
 
 @media (max-width: 760px) {
-  .trip-peru .peru-filter-bar {
+  .trip-peru .peru-filter-bar,
+  .trip-portugal .peru-filter-bar {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -3359,11 +3422,13 @@ img {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .trip-peru .itinerary-card.no-real-image {
+  .trip-peru .itinerary-card.no-real-image,
+  .trip-portugal .itinerary-card.no-real-image {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .trip-peru .itinerary-card.no-real-image .card-body {
+  .trip-peru .itinerary-card.no-real-image .card-body,
+  .trip-portugal .itinerary-card.no-real-image .card-body {
     grid-column: 1;
     grid-row: 1;
   }
@@ -3375,12 +3440,14 @@ img {
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
-.trip-peru .nav-tabs {
+.trip-peru .nav-tabs,
+.trip-portugal .nav-tabs {
   grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 
 .day-rail,
-.trip-peru .day-rail {
+.trip-peru .day-rail,
+.trip-portugal .day-rail {
   position: sticky;
   top: 64px;
   z-index: 38;
@@ -3391,7 +3458,8 @@ img {
 }
 
 .filter-bar,
-.trip-peru .peru-filter-bar {
+.trip-peru .peru-filter-bar,
+.trip-portugal .peru-filter-bar {
   top: 144px;
   z-index: 36;
   grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.2fr);
@@ -3592,18 +3660,21 @@ img {
     grid-template-columns: repeat(7, minmax(92px, 1fr));
   }
 
-  .trip-peru .nav-tabs {
+  .trip-peru .nav-tabs,
+.trip-portugal .nav-tabs {
     grid-template-columns: repeat(8, minmax(92px, 1fr));
   }
 
   .day-rail,
-  .trip-peru .day-rail {
+  .trip-peru .day-rail,
+.trip-portugal .day-rail {
     top: 144px;
     margin-bottom: 8px;
   }
 
   .filter-bar,
-  .trip-peru .peru-filter-bar {
+  .trip-peru .peru-filter-bar,
+.trip-portugal .peru-filter-bar {
     position: sticky;
     top: 220px;
     grid-template-columns: minmax(0, 1fr);
