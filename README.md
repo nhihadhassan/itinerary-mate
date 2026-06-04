@@ -6,7 +6,7 @@ Itinerary Mate is a local-first multi-trip itinerary tracker built with Vite, Re
 - Peru Trip: a July 11-26, 2026 Wanderlog import enriched from the local Wanderlog PDF, with 55 dated cards, exact route-leg timing text, 16 daily route summaries, 4 flights, 10 lodging blocks, 2 train/transit blocks, 19 imported CAD expenses, and PEN + CAD planning displays.
 - Portugal Trip: a June 8-24, 2026 mainland Portugal plan imported from the local Google Docs PDF and Wanderlog PDF, with Lisbon, Lagos, Sintra, Porto, Douro Valley, booked flights, booked lodging, route timing text, map rows, calendar view, and EUR + CAD budgeting.
 
-The app is designed as a travel command center: editable cards, budget dashboards, lodging and flight tracking, attachment placeholders, route suggestions, Google Maps export, CSV export, dark mode, and offline-ready PWA basics.
+The app is designed as a travel command center: editable cards, budget dashboards, lodging and flight tracking, attachment placeholders, route suggestions, OpenStreetMap-based map previews, CSV export, dark mode, and offline-ready PWA basics.
 
 ## Run Locally
 
@@ -45,8 +45,11 @@ pnpm preview
 - `src/japanItinerary.ts`: Japan source itinerary and original budget route data.
 - `src/peruItinerary.ts`: Peru trip seed data, flights, hotels, attachments, and route suggestions.
 - `src/portugalItinerary.ts`: Portugal trip seed data from the Google Docs PDF and Wanderlog PDF, including flights, hotels, activities, attachments, route summaries, and region calendar blocks.
+- `src/lib/placeParsing.ts`: Google Maps URL parsing helpers adapted from the MIT-licensed `Dobidop/easyItinerary` reference.
+- `src/lib/openMapServices.ts`: future-ready wrappers for free/open POI and routing services: Photon, Nominatim, Overpass, and OSRM.
 - `src/tripTypes.ts`: shared trip, activity, flight, hotel, attachment, and route suggestion types.
 - `src/importTemplates/peruWanderlogTemplate.ts`: paste-ready format for adding more Peru details from Wanderlog, Google Docs, emails, or notes.
+- `docs/easyItinerary-reference.md`: downloaded reference inventory for useful EasyItinerary functions and future adaptation notes.
 - `public/manifest.webmanifest`, `public/sw.js`, `public/icon.svg`: installable PWA shell and core asset caching.
 
 ## Peru Import Workflow
@@ -85,6 +88,17 @@ Limitations:
 - The AI Assistant panel uses local rules only and does not call paid AI APIs.
 - Attachments are local metadata placeholders, not secure file storage.
 
+## Open Map Services
+
+Itinerary Mate no longer loads the Google Maps JavaScript API. Maps and future POI enrichment are designed around free/open services:
+
+- OpenStreetMap raster tiles for map previews.
+- Photon and Nominatim for place search/geocoding.
+- Overpass for public OSM place tags such as website, hours, phone, cuisine, and address when available.
+- OSRM for rough route estimates when coordinates exist.
+
+These services are not a replacement for Google Places review/rating data. Public endpoints can be rate-limited or unavailable, so the app keeps saved itinerary data local and treats live POI enrichment as optional.
+
 ## Deploy To Vercel
 
 Recommended path: GitHub + Vercel dashboard.
@@ -109,7 +123,7 @@ The repo includes `vercel.json` with the Vite build settings.
 - Confirm Japan branch switching still works.
 - Edit an activity note or cost, refresh, and confirm localStorage persistence.
 - Toggle dark mode and refresh.
-- Confirm Google Maps copy export and CSV export for both trips.
+- Confirm open map copy export and CSV export for both trips.
 - Check desktop, tablet, and 375px mobile widths for horizontal overflow.
 - Confirm production build has `manifest.webmanifest` and service worker registration.
 - Open the deployed Vercel URL on a phone.

@@ -2073,31 +2073,6 @@ img {
   background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%;
 }
 
-.google-map-canvas {
-  position: relative;
-  display: grid;
-  min-height: 390px;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--blue) 18%, var(--line));
-  border-radius: 14px;
-  background: var(--soft);
-}
-
-.google-map-canvas span {
-  position: absolute;
-  z-index: 1;
-  left: 12px;
-  bottom: 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 253, 248, 0.88);
-  color: var(--muted);
-  padding: 6px 10px;
-  font-size: 0.8rem;
-  pointer-events: none;
-}
-
 .map-tiles {
   position: absolute;
   inset: 0;
@@ -2560,10 +2535,6 @@ img {
   }
 
   .map-canvas {
-    min-height: 300px;
-  }
-
-  .google-map-canvas {
     min-height: 300px;
   }
 
