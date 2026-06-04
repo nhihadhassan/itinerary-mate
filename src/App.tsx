@@ -2124,12 +2124,9 @@ function TripDestinationMap({ trip, activities }: { trip: Trip; activities: Trip
       activity.latitude !== undefined &&
       activity.longitude !== undefined &&
       activity.type !== "flight" &&
-      activity.type !== "transport" &&
-      activity.category !== "Flight" &&
-      activity.category !== "Transit"
+      activity.category !== "Flight"
     )
-    .filter((activity, index, list) => list.findIndex((item) => item.title === activity.title && item.city === activity.city) === index)
-    .slice(0, 24);
+    .filter((activity, index, list) => list.findIndex((item) => item.title === activity.title && item.city === activity.city) === index);
 
   if (!destinationStops.length) {
     return <EmptyState title={`No ${trip.country} map pins yet`} body={`${trip.country} destinations with saved coordinates will appear here.`} />;
@@ -2152,7 +2149,13 @@ function TripDestinationMap({ trip, activities }: { trip: Trip; activities: Trip
           <MapIcon size={15} aria-hidden="true" />
         </button>
       </div>
-      <LeafletOverviewMap trip={trip} stops={destinationStops} fitNonce={fitNonce} />
+      <LeafletActivityMap
+        trip={trip}
+        stops={destinationStops}
+        fitNonce={fitNonce}
+        className="overview-map-canvas leaflet-overview-map"
+        ariaLabel={`Interactive map of ${trip.country} destinations`}
+      />
       <div className="easy-map-caption">
         <div>
           <p className="eyebrow">{trip.country} map</p>
@@ -2165,7 +2168,19 @@ function TripDestinationMap({ trip, activities }: { trip: Trip; activities: Trip
   );
 }
 
-function LeafletOverviewMap({ trip, stops, fitNonce }: { trip: Trip; stops: TripActivity[]; fitNonce: number }) {
+function LeafletActivityMap({
+  trip,
+  stops,
+  fitNonce = 0,
+  className = "leaflet-activity-map",
+  ariaLabel,
+}: {
+  trip: Trip;
+  stops: TripActivity[];
+  fitNonce?: number;
+  className?: string;
+  ariaLabel: string;
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
@@ -2194,7 +2209,10 @@ function LeafletOverviewMap({ trip, stops, fitNonce }: { trip: Trip; stops: Trip
     }).addTo(map);
     markerLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
-    window.setTimeout(() => map.invalidateSize(), 80);
+    window.setTimeout(() => {
+      map.invalidateSize();
+      fitLeafletStops(map, stopsRef.current, false);
+    }, 80);
 
     return () => {
       map.remove();
@@ -2226,28 +2244,32 @@ function LeafletOverviewMap({ trip, stops, fitNonce }: { trip: Trip; stops: Trip
       `);
       markerLayer.addLayer(marker);
     });
+    const map = mapRef.current;
+    if (map) {
+      window.setTimeout(() => fitLeafletStops(map, stopsRef.current, false), 40);
+    }
   }, [stops]);
 
   useEffect(() => {
     if (!fitNonce || !mapRef.current) return;
-    fitLeafletStops(mapRef.current, stopsRef.current);
+    fitLeafletStops(mapRef.current, stopsRef.current, true);
   }, [fitNonce]);
 
-  return <div ref={containerRef} className="overview-map-canvas leaflet-overview-map" aria-label={`Interactive map of ${trip.country} destinations`} />;
+  return <div ref={containerRef} className={className} aria-label={ariaLabel} />;
 }
 
 function overviewLeafletView(trip: Trip): { center: L.LatLngExpression; zoom: number } {
-  if (trip.id === "portugal-2026") return { center: [43.2, -17.5], zoom: 3 };
+  if (trip.id === "portugal-2026") return { center: [39.6, -8.8], zoom: 6 };
   if (trip.id === "peru-2026") return { center: [-9.2, -74.5], zoom: 5 };
   return { center: [35.7, 139.7], zoom: 5 };
 }
 
-function fitLeafletStops(map: L.Map, stops: TripActivity[]) {
+function fitLeafletStops(map: L.Map, stops: TripActivity[], animate = true) {
   const latLngs = stops
     .filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined)
     .map((activity) => [activity.latitude!, activity.longitude!] as L.LatLngTuple);
   if (!latLngs.length) return;
-  map.fitBounds(L.latLngBounds(latLngs).pad(0.24), { animate: true, maxZoom: 11 });
+  map.fitBounds(L.latLngBounds(latLngs).pad(0.18), { animate, maxZoom: 11 });
 }
 
 function escapeHtml(value = "") {
@@ -3320,52 +3342,7 @@ function TripMapPanel({
   }
 
   const coordinateStops = stops.filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined);
-
-  const bounds = coordinateStops.reduce(
-    (acc, activity) => ({
-      minLat: Math.min(acc.minLat, activity.latitude ?? acc.minLat),
-      maxLat: Math.max(acc.maxLat, activity.latitude ?? acc.maxLat),
-      minLng: Math.min(acc.minLng, activity.longitude ?? acc.minLng),
-      maxLng: Math.max(acc.maxLng, activity.longitude ?? acc.maxLng),
-    }),
-    { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 },
-  );
   const hasCoordinates = coordinateStops.length > 0;
-  const hasBounds = coordinateStops.length >= 2 && bounds.maxLat !== bounds.minLat && bounds.maxLng !== bounds.minLng;
-  const zoom = hasCoordinates ? getMapZoom(hasBounds ? bounds : { minLat: coordinateStops[0].latitude!, maxLat: coordinateStops[0].latitude!, minLng: coordinateStops[0].longitude!, maxLng: coordinateStops[0].longitude! }) : 4;
-  const centerLat = hasCoordinates ? (bounds.minLat + bounds.maxLat) / 2 : 0;
-  const centerLng = hasCoordinates ? (bounds.minLng + bounds.maxLng) / 2 : 0;
-  const centerTileX = longitudeToTileX(centerLng, zoom);
-  const centerTileY = latitudeToTileY(centerLat, zoom);
-  const tileColumns = 5;
-  const tileRows = 4;
-  const startTileX = Math.floor(centerTileX - tileColumns / 2);
-  const startTileY = Math.floor(centerTileY - tileRows / 2);
-  const maxTile = 2 ** zoom;
-  const mapTiles = Array.from({ length: tileColumns * tileRows }, (_, index) => {
-    const col = index % tileColumns;
-    const row = Math.floor(index / tileColumns);
-    const tileX = startTileX + col;
-    const tileY = clamp(startTileY + row, 0, maxTile - 1);
-    const wrappedX = ((tileX % maxTile) + maxTile) % maxTile;
-    return {
-      key: `${zoom}-${tileX}-${tileY}`,
-      url: `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
-      left: `${(col / tileColumns) * 100}%`,
-      top: `${(row / tileRows) * 100}%`,
-      width: `${100 / tileColumns}%`,
-      height: `${100 / tileRows}%`,
-    };
-  });
-  const pins = stops.map((activity, index) => {
-    const hasPinCoordinates = activity.latitude !== undefined && activity.longitude !== undefined && hasCoordinates;
-    const projectedX = hasPinCoordinates ? longitudeToTileX(activity.longitude!, zoom) : startTileX + 0.7 + ((index * 0.75) % 3.4);
-    const projectedY = hasPinCoordinates ? latitudeToTileY(activity.latitude!, zoom) : startTileY + 0.6 + ((index * 0.8) % 2.5);
-    const x = ((projectedX - startTileX) / tileColumns) * 100;
-    const y = ((projectedY - startTileY) / tileRows) * 100;
-    return { activity, index, x: Math.max(8, Math.min(90, x)), y: Math.max(8, Math.min(88, y)), kind: pinKind(activity) };
-  });
-  const routePoints = pins.map((pin) => `${pin.x},${pin.y}`).join(" ");
   const targetDay = selectedDay === "All" ? stops[0]?.day || 1 : selectedDay;
   const searchBias = coordinateStops.length
     ? {
@@ -3424,31 +3401,19 @@ function TripMapPanel({
           ))}
         </div>
       )}
-      <div className="map-canvas">
-        {hasCoordinates && (
-          <div className="map-tiles" aria-hidden="true">
-            {mapTiles.map((tile) => (
-              <img key={tile.key} src={tile.url} alt="" loading="lazy" style={{ left: tile.left, top: tile.top, width: tile.width, height: tile.height }} />
-            ))}
-          </div>
-        )}
-        <svg className="map-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <polyline points={routePoints} />
-        </svg>
-        {pins.map((pin) => (
-          <a
-            key={pin.activity.id}
-            className={`map-pin pin-${pin.kind}`}
-            style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
-            title={pin.activity.title}
-            href={googleMapUrl(pin.activity)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {pin.index + 1}
-          </a>
-        ))}
-      </div>
+      {hasCoordinates ? (
+        <LeafletActivityMap
+          trip={trip}
+          stops={coordinateStops}
+          className="map-canvas leaflet-itinerary-map"
+          ariaLabel={`${dayLabel} interactive itinerary map`}
+        />
+      ) : (
+        <div className="map-canvas map-canvas-empty">
+          <MapPin size={22} aria-hidden="true" />
+          <span>Add coordinates to show this day on the map.</span>
+        </div>
+      )}
       <div className="map-legend" aria-label="Map pin legend">
         <span><i className="legend-dot attraction" /> attractions</span>
         <span><i className="legend-dot hotel" /> hotels</span>
@@ -3513,7 +3478,12 @@ function TripDayMapStack({ trip, activities }: { trip: Trip; activities: TripAct
               </div>
               <span>{stops.length} pins</span>
             </div>
-            <MapTileCanvas trip={trip} stops={stops} className="day-map-canvas" />
+            <LeafletActivityMap
+              trip={trip}
+              stops={stops}
+              className="map-canvas day-map-canvas leaflet-itinerary-map"
+              ariaLabel={`Day ${day} interactive map`}
+            />
             <div className="map-route-list compact-map-route-list">
               {stops.slice(0, 4).map((activity, index) => (
                 <a key={activity.id} href={googleMapUrl(activity)} target="_blank" rel="noreferrer">
