@@ -2058,6 +2058,85 @@ img {
   font-weight: 750;
 }
 
+.map-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.map-search label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0 12px;
+}
+
+.map-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.map-search button,
+.map-search-results button {
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--trip-accent) 30%, var(--line));
+  border-radius: 12px;
+  background: var(--trip-accent);
+  color: #fff;
+  padding: 0 14px;
+  font-weight: 800;
+}
+
+.map-search-results {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--trip-accent-2));
+  padding: 8px;
+}
+
+.map-search-results > p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin: 0;
+}
+
+.map-search-results article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-strong);
+  padding: 9px;
+}
+
+.map-search-results strong,
+.map-search-results span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.map-search-results span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin-top: 2px;
+}
+
 .map-canvas {
   position: relative;
   min-height: 390px;
@@ -2479,13 +2558,17 @@ img {
 
 @media (min-width: 1080px) {
   .planner-split {
-    grid-template-columns: minmax(0, 0.95fr) minmax(420px, 0.75fr);
+    grid-template-columns: minmax(430px, 0.78fr) minmax(560px, 1.12fr);
     align-items: start;
   }
 
   .map-panel {
     position: sticky;
     top: 150px;
+  }
+
+  .map-canvas {
+    min-height: min(68vh, 760px);
   }
 
   .itinerary-card {

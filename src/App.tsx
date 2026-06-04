@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Dispatch, ReactNode, SetStateAction } from "react";
+import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -58,6 +58,8 @@ import { japanExploreKinds, japanExplorePlaces } from "./japanExplore";
 import type { JapanExploreKind, JapanExplorePlace } from "./japanExplore";
 import { discoveryKinds, discoveryPlaces, discoveryWindows } from "./discoveryPlaces";
 import type { DiscoveryKind, DiscoveryPlace, DiscoveryWindow } from "./discoveryPlaces";
+import { searchOpenPlaces } from "./lib/openMapServices";
+import type { OpenPlaceSearchResult } from "./lib/openMapServices";
 import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
 
 type AppView = "dashboard" | "itinerary" | "calendar" | "places" | "discovery" | "budget" | "maps" | "more";
@@ -843,6 +845,59 @@ function App() {
     setSaveStatus(`Added ${place.title} to Day ${day}`);
   }
 
+  function addOpenMapPlace(place: OpenPlaceSearchResult, day: number) {
+    const targetDay = Number.isFinite(day) && day > 0 ? day : 1;
+    const id = `${activeTrip.id}-map-${Date.now()}`;
+    const category: TripCategory =
+      place.osmClass === "amenity" && ["restaurant", "cafe", "bar", "pub", "fast_food"].includes(place.osmType || "")
+        ? "Food"
+        : place.osmType === "hotel" || place.osmType === "hostel" || place.osmType === "guest_house"
+          ? "Hotel"
+          : "Nice To Have";
+    const newActivity: TripActivity = {
+      id,
+      tripId: activeTrip.id,
+      day: targetDay,
+      date: dateForTripDay(activeTrip.startDate, targetDay),
+      city: place.city || (selectedCity !== "All" ? selectedCity : activeTrip.country),
+      country: activeTrip.country,
+      title: place.name,
+      type: category === "Food" ? "food" : category === "Hotel" ? "hotel" : "activity",
+      description: "Added from open map search. Add notes once you decide if it belongs.",
+      category,
+      address: place.address,
+      googleMapsQuery: place.address || `${place.name} ${activeTrip.country}`,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      duration: "Add timing",
+      travelTimeFromPrevious: "Add estimate",
+      estimatedCost: 0,
+      estimatedCostLow: activeTrip.currency === "JPY" ? 0 : undefined,
+      estimatedCostMid: activeTrip.currency === "JPY" ? 0 : undefined,
+      estimatedCostHigh: activeTrip.currency === "JPY" ? 0 : undefined,
+      currency: activeTrip.currency,
+      costLocal: 0,
+      localCurrencyCode: activeTrip.currency,
+      costCad: 0,
+      costCategory: category === "Food" ? "food" : category === "Hotel" ? "hotel" : "activity",
+      costStatus: "manual",
+      bookingStatus: "not-booked",
+      attachmentIds: [],
+      notes: `Source: OpenStreetMap/Photon search. OSM type: ${[place.osmClass, place.osmType].filter(Boolean).join(" / ") || "unknown"}.`,
+      imageUrl: placeholderFor(place.name),
+      imageAlt: `Map search placeholder for ${place.name}.`,
+      priority: 3,
+      isBooked: false,
+      isCompleted: false,
+      source: "manual",
+    };
+    updateActiveTrip({ activities: [newActivity, ...activeTrip.activities] });
+    setExpandedId(id);
+    setSelectedDay(targetDay);
+    setActiveView("itinerary");
+    setSaveStatus(`Added ${place.name} to Day ${targetDay}`);
+  }
+
   function deleteActivity(id: string) {
     const item = activeTrip.activities.find((activity) => activity.id === id);
     if (!item || !window.confirm(`Delete "${item.title}" from ${activeTrip.title}?`)) return;
@@ -1059,6 +1114,7 @@ function App() {
                 trip={activeTrip}
                 activities={selectedDayActivities.length ? selectedDayActivities : filteredActivities}
                 selectedDay={selectedDay}
+                onAddPlace={addOpenMapPlace}
               />
             </div>
           )}
@@ -1131,6 +1187,7 @@ function App() {
               }}
               downloadCsv={downloadCsv}
               exchangeRate={activeExchangeRate}
+              onAddPlace={addOpenMapPlace}
             />
           )}
 
@@ -2804,7 +2861,20 @@ function isLongDistanceTransitDay(trip: Trip, activities: TripActivity[], select
   return Math.max(...latitudes) - Math.min(...latitudes) > 3 || Math.max(...longitudes) - Math.min(...longitudes) > 3;
 }
 
-function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activities: TripActivity[]; selectedDay: number | "All" }) {
+function TripMapPanel({
+  trip,
+  activities,
+  selectedDay,
+  onAddPlace,
+}: {
+  trip: Trip;
+  activities: TripActivity[];
+  selectedDay: number | "All";
+  onAddPlace: (place: OpenPlaceSearchResult, day: number) => void;
+}) {
+  const [mapSearchQuery, setMapSearchQuery] = useState("");
+  const [mapSearchResults, setMapSearchResults] = useState<OpenPlaceSearchResult[]>([]);
+  const [mapSearchStatus, setMapSearchStatus] = useState("");
   const stops = activities
     .filter((activity) => activity.latitude !== undefined || activity.googleMapsQuery || activity.address)
     .slice(0, 14);
@@ -2861,6 +2931,28 @@ function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activitie
     return { activity, index, x: Math.max(8, Math.min(90, x)), y: Math.max(8, Math.min(88, y)), kind: pinKind(activity) };
   });
   const routePoints = pins.map((pin) => `${pin.x},${pin.y}`).join(" ");
+  const targetDay = selectedDay === "All" ? stops[0]?.day || 1 : selectedDay;
+  const searchBias = coordinateStops.length
+    ? {
+        latitude: coordinateStops.reduce((sum, activity) => sum + activity.latitude!, 0) / coordinateStops.length,
+        longitude: coordinateStops.reduce((sum, activity) => sum + activity.longitude!, 0) / coordinateStops.length,
+      }
+    : undefined;
+
+  async function runMapSearch(event?: FormEvent) {
+    event?.preventDefault();
+    const query = mapSearchQuery.trim();
+    if (query.length < 3) {
+      setMapSearchStatus("Type at least 3 characters.");
+      setMapSearchResults([]);
+      return;
+    }
+    setMapSearchStatus("Searching open map data...");
+    const results = await searchOpenPlaces(query, searchBias);
+    setMapSearchResults(results);
+    setMapSearchStatus(results.length ? `${results.length} open map results` : "No places found. Try adding a city or country.");
+  }
+
   return (
     <aside className="map-panel" aria-label={`${trip.title} map preview`}>
       <div className="map-panel-header">
@@ -2870,6 +2962,33 @@ function TripMapPanel({ trip, activities, selectedDay }: { trip: Trip; activitie
         </div>
         <span>{stops.length} pins</span>
       </div>
+      <form className="map-search" onSubmit={runMapSearch}>
+        <label>
+          <Search size={16} aria-hidden="true" />
+          <input
+            value={mapSearchQuery}
+            onChange={(event) => setMapSearchQuery(event.target.value)}
+            placeholder={`Search places near ${trip.country}`}
+          />
+        </label>
+        <button type="submit">Search</button>
+      </form>
+      {(mapSearchStatus || mapSearchResults.length > 0) && (
+        <div className="map-search-results" aria-live="polite">
+          {mapSearchStatus && <p>{mapSearchStatus}</p>}
+          {mapSearchResults.slice(0, 5).map((result) => (
+            <article key={`${result.latitude}-${result.longitude}-${result.name}`}>
+              <div>
+                <strong>{result.name}</strong>
+                <span>{[result.city, result.country].filter(Boolean).join(", ") || result.address}</span>
+              </div>
+              <button type="button" onClick={() => onAddPlace(result, targetDay)}>
+                Add to Day {targetDay}
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
       <div className="map-canvas">
         {hasCoordinates && (
           <div className="map-tiles" aria-hidden="true">
@@ -3257,7 +3376,23 @@ function AttachmentCard({ attachment }: { attachment: TripAttachment }) {
   );
 }
 
-function MapsExport({ trip, activities, allActivities, copyRows, downloadCsv, exchangeRate }: { trip: Trip; activities: TripActivity[]; allActivities: TripActivity[]; copyRows: (rows: ReturnType<typeof exportRows>) => Promise<void>; downloadCsv: (rows?: ReturnType<typeof exportRows>) => void; exchangeRate: number }) {
+function MapsExport({
+  trip,
+  activities,
+  allActivities,
+  copyRows,
+  downloadCsv,
+  exchangeRate,
+  onAddPlace,
+}: {
+  trip: Trip;
+  activities: TripActivity[];
+  allActivities: TripActivity[];
+  copyRows: (rows: ReturnType<typeof exportRows>) => Promise<void>;
+  downloadCsv: (rows?: ReturnType<typeof exportRows>) => void;
+  exchangeRate: number;
+  onAddPlace: (place: OpenPlaceSearchResult, day: number) => void;
+}) {
   const rows = exportRows(activities);
   const categories = Array.from(new Set(allActivities.map((activity) => activity.category))).sort();
   const days = Array.from(new Set(allActivities.map((activity) => activity.day))).sort((a, b) => a - b);
@@ -3274,7 +3409,7 @@ function MapsExport({ trip, activities, allActivities, copyRows, downloadCsv, ex
         <button className="primary-button" type="button" onClick={() => copyRows(exportRows(allActivities))}><Clipboard size={17} /> Copy all</button>
         <button className="ghost-button" type="button" onClick={() => downloadCsv(exportRows(allActivities))}><Download size={17} /> Download CSV</button>
       </div>
-      <TripMapPanel trip={trip} activities={activities} selectedDay={activities[0]?.day || "All"} />
+      <TripMapPanel trip={trip} activities={activities} selectedDay={activities[0]?.day || "All"} onAddPlace={onAddPlace} />
       <div className="export-group-grid">
         <section>
           <h3>By category</h3>
