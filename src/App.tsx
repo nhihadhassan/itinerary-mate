@@ -2258,6 +2258,52 @@ function LeafletActivityMap({
   return <div ref={containerRef} className={className} aria-label={ariaLabel} />;
 }
 
+function LazyLeafletActivityMap({
+  trip,
+  stops,
+  className,
+  ariaLabel,
+}: {
+  trip: Trip;
+  stops: TripActivity[];
+  className: string;
+  ariaLabel: string;
+}) {
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isVisible) return;
+    const node = shellRef.current;
+    if (!node || !("IntersectionObserver" in window)) {
+      setIsVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "260px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isVisible]);
+
+  if (isVisible) {
+    return <LeafletActivityMap trip={trip} stops={stops} className={className} ariaLabel={ariaLabel} />;
+  }
+
+  return (
+    <div ref={shellRef} className={`${className} lazy-map-placeholder`} aria-label={ariaLabel}>
+      <MapPin size={18} aria-hidden="true" />
+      <span>Map loads as you scroll</span>
+    </div>
+  );
+}
+
 function overviewLeafletView(trip: Trip): { center: L.LatLngExpression; zoom: number } {
   if (trip.id === "portugal-2026") return { center: [39.6, -8.8], zoom: 6 };
   if (trip.id === "peru-2026") return { center: [-9.2, -74.5], zoom: 5 };
@@ -3478,7 +3524,7 @@ function TripDayMapStack({ trip, activities }: { trip: Trip; activities: TripAct
               </div>
               <span>{stops.length} pins</span>
             </div>
-            <LeafletActivityMap
+            <LazyLeafletActivityMap
               trip={trip}
               stops={stops}
               className="map-canvas day-map-canvas leaflet-itinerary-map"

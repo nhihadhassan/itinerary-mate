@@ -2385,6 +2385,21 @@ img {
   aspect-ratio: 1 / 1;
 }
 
+.lazy-map-placeholder {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  background:
+    linear-gradient(90deg, rgba(255, 253, 248, 0.62) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 253, 248, 0.62) 1px, transparent 1px),
+    linear-gradient(135deg, #dbece9, #edf1df);
+  background-size: 36px 36px, 36px 36px, 100% 100%;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: center;
+}
+
 .compact-map-route-list {
   grid-template-columns: minmax(0, 1fr);
   gap: 6px;
