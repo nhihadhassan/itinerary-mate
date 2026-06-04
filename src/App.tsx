@@ -102,7 +102,7 @@ const baseNavItems: Array<{ id: AppView; label: string }> = [
   { id: "places", label: "Explore" },
   { id: "budget", label: "Budget" },
   { id: "maps", label: "Map / Export" },
-  { id: "more", label: "More" },
+  { id: "more", label: "Resources" },
 ];
 
 const categoryOptions: TripCategory[] = [
@@ -562,10 +562,10 @@ function visibleActivities(trip: Trip, branch: TripBranch) {
 function App() {
   const initial = useMemo(loadState, []);
   const [state, setState] = useState<MultiTripState>(initial);
-  const [activeView, setActiveView] = useState<AppView>("itinerary");
+  const [activeView, setActiveView] = useState<AppView>("dashboard");
   const [selectedCategory, setSelectedCategory] = useState<TripCategory | "All">("All");
   const [selectedCity, setSelectedCity] = useState("All");
-  const [selectedDay, setSelectedDay] = useState<number | "All">(1);
+  const [selectedDay, setSelectedDay] = useState<number | "All">("All");
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState("Saved locally");
@@ -624,7 +624,7 @@ function App() {
     });
   }, [allVisibleActivities, query, selectedCategory, selectedCity]);
 
-  const timelineDays = useMemo(() => (selectedDay === "All" ? days : days.includes(selectedDay) ? [selectedDay] : [days[0] || 1]), [days, selectedDay]);
+  const timelineDays = useMemo(() => (activeView === "itinerary" ? days : selectedDay === "All" ? days : days.includes(selectedDay) ? [selectedDay] : [days[0] || 1]), [activeView, days, selectedDay]);
   const selectedDayActivities = useMemo(
     () => (selectedDay === "All" ? filteredActivities : filteredActivities.filter((activity) => activity.day === selectedDay)),
     [filteredActivities, selectedDay],
@@ -646,12 +646,12 @@ function App() {
   }, [resolvedTheme]);
 
   useEffect(() => {
-    setSelectedDay(1);
+    setSelectedDay("All");
     setSelectedCategory("All");
     setSelectedCity("All");
     setQuery("");
     setExpandedId(null);
-    setActiveView("itinerary");
+    setActiveView("dashboard");
   }, [state.activeTripId]);
 
   useEffect(() => {
@@ -680,6 +680,22 @@ function App() {
         },
       },
     }));
+  }
+
+  function openView(view: AppView) {
+    setActiveView(view);
+    if (view === "itinerary") setSelectedDay("All");
+  }
+
+  function jumpToItineraryDay(day: number) {
+    if (activeView === "itinerary") {
+      setSelectedDay("All");
+      window.requestAnimationFrame(() => {
+        document.getElementById(`itinerary-day-${day}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      return;
+    }
+    setSelectedDay(day);
   }
 
   function setActiveExchangeRate(localPerCad: number) {
@@ -992,7 +1008,8 @@ function App() {
             activeView={activeView}
             setActiveTripId={(activeTripId) => {
               updateState({ activeTripId });
-              if (activeView === "discovery") setActiveView("itinerary");
+              setSelectedDay("All");
+              setActiveView("dashboard");
             }}
             openDiscovery={() => setActiveView("discovery")}
           />
@@ -1011,18 +1028,20 @@ function App() {
 
       <nav className="nav-tabs" aria-label="Planner sections">
         {activeNavItems.map((item) => (
-          <button key={item.id} type="button" className={activeView === item.id ? "active" : ""} onClick={() => setActiveView(item.id)}>
+          <button key={item.id} type="button" className={activeView === item.id ? "active" : ""} onClick={() => openView(item.id)}>
             {item.label}
           </button>
         ))}
       </nav>
 
-      {!(bookedTripIds.has(activeTrip.id) && activeView === "dashboard") && !isJapanExploreView && !isTripCalendarView && !isDiscoveryView && (
+      {activeView !== "dashboard" && !isJapanExploreView && !isTripCalendarView && !isDiscoveryView && (
         <DayRail
           days={days}
           activities={allVisibleActivities}
           selectedDay={selectedDay}
           setSelectedDay={setSelectedDay}
+          onJumpToDay={jumpToItineraryDay}
+          jumpMode={activeView === "itinerary"}
           trip={activeTrip}
           exchangeRate={activeExchangeRate}
         />
@@ -1132,8 +1151,11 @@ function App() {
               activities={allVisibleActivities}
               exchangeRate={activeExchangeRate}
               openItineraryDay={(day) => {
-                setSelectedDay(day);
+                setSelectedDay("All");
                 setActiveView("itinerary");
+                window.requestAnimationFrame(() => {
+                  document.getElementById(`itinerary-day-${day}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                });
               }}
             />
           )}
@@ -1309,6 +1331,8 @@ function DayRail({
   activities,
   selectedDay,
   setSelectedDay,
+  onJumpToDay,
+  jumpMode,
   trip,
   exchangeRate,
 }: {
@@ -1316,6 +1340,8 @@ function DayRail({
   activities: TripActivity[];
   selectedDay: number | "All";
   setSelectedDay: (day: number | "All") => void;
+  onJumpToDay?: (day: number) => void;
+  jumpMode?: boolean;
   trip: Trip;
   exchangeRate: number;
 }) {
@@ -1340,7 +1366,7 @@ function DayRail({
             key={day}
             type="button"
             className={selectedDay === day ? "day-chip active" : "day-chip"}
-            onClick={() => setSelectedDay(day)}
+            onClick={() => (jumpMode && onJumpToDay ? onJumpToDay(day) : setSelectedDay(day))}
           >
             <span>Day {day}</span>
             <small>{first?.date ? formatDate(first.date) : first?.city || trip.country}</small>
@@ -1434,6 +1460,8 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
   const nextFlight = trip.flights.find((flight) => new Date(flight.departureTime).getTime() >= Date.now()) || trip.flights[0];
   const nextHotel = trip.hotels[0];
   const totalDays = Math.max(...activities.map((activity) => activity.day), 1);
+  const reservationCount = trip.flights.length + trip.hotels.length + activities.filter((activity) => activity.type === "transport" || activity.type === "flight" || activity.category === "Transit" || activity.category === "Flight").length;
+  const savedLinks = trip.attachments.length + activities.filter((activity) => activity.googleMapsQuery || activity.sourceUrl || activity.address).length;
   if (bookedTripIds.has(trip.id)) {
     return (
       <section className="content-section peru-overview">
@@ -1452,8 +1480,10 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
           </div>
         </div>
         <div className="dashboard-grid peru-dashboard-grid">
-          <MetricCard label="Total" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={formatLocalOnly(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
+          <MetricCard label="Budget spent" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={formatLocalOnly(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
           <MetricCard label="Days" value={String(totalDays)} detail={`${activities.length} stops`} icon={<CalendarDays size={18} />} />
+          <MetricCard label="Activities" value={String(activities.length)} detail={`${reservationCount} reservations / transport`} icon={<MapPin size={18} />} />
+          <MetricCard label="Saved links" value={String(savedLinks)} detail={`${trip.attachments.length} attachments`} icon={<Bookmark size={18} />} />
           <MetricCard label="Booked" value={String(booked)} detail={`${incomplete} incomplete`} icon={<BadgeCheck size={18} />} />
           <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
         </div>
@@ -1462,6 +1492,7 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
           <TripImageSlideshow trip={trip} activities={activities} />
         </div>
         <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
+        <OverviewChecklist trip={trip} />
       </section>
     );
   }
@@ -1476,7 +1507,9 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
       </div>
       <div className="dashboard-grid">
         <MetricCard label="Days" value={String(totalDays)} detail={`${formatDate(trip.startDate)} to ${formatDate(trip.endDate)}`} icon={<CalendarDays size={18} />} />
-        <MetricCard label="Rough estimate" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={getLocalCostSubtext(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="Budget spent" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={getLocalCostSubtext(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="Activities" value={String(activities.length)} detail={`${reservationCount} reservations / transport`} icon={<MapPin size={18} />} />
+        <MetricCard label="Saved links" value={String(savedLinks)} detail={`${trip.attachments.length} attachments`} icon={<Bookmark size={18} />} />
         <MetricCard label="Booked items" value={String(booked)} detail="Includes manual flight records" icon={<BadgeCheck size={18} />} />
         <MetricCard label="Incomplete" value={String(incomplete)} detail="Activities still open" icon={<CheckCircle2 size={18} />} />
         <MetricCard label="Next flight" value={nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : "Add flight"} detail={nextFlight ? `${nextFlight.departureAirport} to ${nextFlight.arrivalAirport}` : "Manual tracker ready"} icon={<Plane size={18} />} />
@@ -1514,6 +1547,7 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
 
       <SuggestionList suggestions={routeSuggestions.slice(0, 4)} />
       <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
+      <OverviewChecklist trip={trip} />
     </section>
   );
 }
@@ -2099,43 +2133,100 @@ function TripDestinationMap({ trip, activities }: { trip: Trip; activities: Trip
 }
 
 function TripImageSlideshow({ trip, activities }: { trip: Trip; activities: TripActivity[] }) {
+  const curatedSlides = tripHeroSlides[trip.id] || [];
   const slides = useMemo(
-    () =>
-      activities
+    () => {
+      const activitySlides = activities
         .filter((activity) => activity.country === trip.country && isImageUrl(activity.imageUrl) && activity.type !== "flight" && activity.category !== "Flight")
         .filter((activity, index, list) => list.findIndex((item) => item.title === activity.title) === index)
-        .slice(0, 10),
-    [activities, trip.country],
+        .map((activity) => ({ id: activity.id, title: activity.title, city: activity.city, imageUrl: activity.imageUrl, imageAlt: activity.imageAlt || activity.title }));
+      return [...curatedSlides, ...activitySlides].filter((slide, index, list) => list.findIndex((item) => item.imageUrl === slide.imageUrl) === index).slice(0, 10);
+    },
+    [activities, curatedSlides, trip.country],
   );
   const [slideIndex, setSlideIndex] = useState(0);
+  const [brokenSlides, setBrokenSlides] = useState<Set<string>>(() => new Set());
+
+  const visibleSlides = useMemo(() => slides.filter((slide) => !brokenSlides.has(slide.id)), [brokenSlides, slides]);
 
   useEffect(() => {
-    if (slides.length <= 1) return;
-    const timer = window.setInterval(() => setSlideIndex((index) => (index + 1) % slides.length), 4200);
+    if (visibleSlides.length <= 1) return;
+    const timer = window.setInterval(() => setSlideIndex((index) => (index + 1) % visibleSlides.length), 4200);
     return () => window.clearInterval(timer);
-  }, [slides.length]);
+  }, [visibleSlides.length]);
 
-  if (!slides.length) {
+  useEffect(() => {
+    setSlideIndex(0);
+    setBrokenSlides(new Set());
+  }, [trip.id]);
+
+  if (!visibleSlides.length) {
     return <EmptyState title="No destination photos yet" body={`Real ${trip.country} place images will appear here when available.`} />;
   }
 
-  const active = slides[slideIndex % slides.length];
+  const active = visibleSlides[slideIndex % visibleSlides.length];
   return (
     <article className="overview-slideshow-card">
-      <img src={active.imageUrl} alt={active.imageAlt || active.title} loading="lazy" decoding="async" />
+      <img
+        src={active.imageUrl}
+        alt={active.imageAlt || active.title}
+        loading="lazy"
+        decoding="async"
+        onError={() => setBrokenSlides((current) => new Set(current).add(active.id))}
+      />
       <div className="slideshow-caption">
         <p className="eyebrow">Look forward to</p>
         <h2>{active.title}</h2>
         <span>{active.city}</span>
       </div>
       <div className="slideshow-dots" aria-label="Slideshow position">
-        {slides.map((slide, index) => (
+        {visibleSlides.map((slide, index) => (
           <button key={slide.id} type="button" className={index === slideIndex ? "active" : ""} onClick={() => setSlideIndex(index)} aria-label={`Show ${slide.title}`} />
         ))}
       </div>
     </article>
   );
 }
+
+const tripHeroSlides: Partial<Record<TripId, Array<{ id: string; title: string; city: string; imageUrl: string; imageAlt: string }>>> = {
+  "portugal-2026": [
+    {
+      id: "portugal-hero-belem",
+      title: "Belém Tower",
+      city: "Lisbon",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/9e/Lisbon_Torre_de_Bel%C3%A9m_BW_2018-10-03_16-33-21.jpg",
+      imageAlt: "Belém Tower in Lisbon.",
+    },
+    {
+      id: "portugal-hero-piedade",
+      title: "Ponta da Piedade",
+      city: "Lagos",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/1d/Ponta_da_Piedade%2C_Lagos_%2820518421738%29.jpg",
+      imageAlt: "Ponta da Piedade cliffs in Lagos.",
+    },
+    {
+      id: "portugal-hero-pena",
+      title: "Pena Palace",
+      city: "Sintra",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/commons/4/43/Palacio_Nacional_da_Pena%2C_Sintra%2C_Portugal%2C_2019-05-25%2C_DD_131.jpg",
+      imageAlt: "Pena Palace in Sintra.",
+    },
+    {
+      id: "portugal-hero-ribeira",
+      title: "Ribeira",
+      city: "Porto",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/commons/b/bb/Cais_da_Ribeira%2C_Oporto%2C_Portugal%2C_2012-05-09%2C_DD_05.JPG",
+      imageAlt: "Ribeira waterfront in Porto.",
+    },
+    {
+      id: "portugal-hero-douro",
+      title: "Douro Valley",
+      city: "Douro Valley",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/commons/0/04/Douro_Valley%2C_Portugal_%2853973809897%29.jpg",
+      imageAlt: "Vineyards in the Douro Valley.",
+    },
+  ],
+};
 
 function OverviewLogistics({ trip, routeSuggestions, exchangeRate }: { trip: Trip; routeSuggestions: RouteSuggestion[]; exchangeRate: number }) {
   const transferSuggestions = routeSuggestions.filter((suggestion) => suggestion.severity === "warning").slice(0, 3);
@@ -2186,6 +2277,39 @@ function OverviewLogistics({ trip, routeSuggestions, exchangeRate }: { trip: Tri
       </div>
     </section>
   );
+}
+
+function OverviewChecklist({ trip }: { trip: Trip }) {
+  const checklist = tripChecklistItems(trip);
+  return (
+    <section className="overview-logistics overview-checklist">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Checklist</p>
+          <h2>Small things to keep track of</h2>
+        </div>
+        <Clipboard size={20} aria-hidden="true" />
+      </div>
+      <div className="checklist-grid">
+        {checklist.map((item) => (
+          <label className="checklist-row" key={item}>
+            <input type="checkbox" />
+            <span>{item}</span>
+          </label>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function tripChecklistItems(trip: Trip) {
+  if (trip.id === "peru-2026") {
+    return ["Passport, adapters, rain shell, altitude basics", "Confirm drivers and train timing", "Save flight and hotel confirmations", "Download offline maps for Cusco and Sacred Valley"];
+  }
+  if (trip.id === "portugal-2026") {
+    return ["Confirm Lagos return transport", "Book Sintra tickets and Douro day", "Save hostel and flight confirmations", "Pack beach shoes, sunscreen, and light layers"];
+  }
+  return ["Pick priority cities before booking", "Save favorite places from Explore", "Check September weather and typhoon backups", "Add flight and stay confirmations later"];
 }
 
 function peruAnchorCopy(title: string) {
@@ -2285,7 +2409,7 @@ function ItineraryTimeline(props: {
 
 function DayDropZone({ day, children }: { day: number; children: ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
-  return <article ref={setNodeRef} className={isOver ? "day-card drop-active" : "day-card"}>{children}</article>;
+  return <article id={`itinerary-day-${day}`} ref={setNodeRef} className={isOver ? "day-card drop-active" : "day-card"}>{children}</article>;
 }
 
 function JapanExploreBoard({
