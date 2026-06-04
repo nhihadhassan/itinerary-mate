@@ -2804,6 +2804,24 @@ img {
 }
 
 .peru-overview {
+  padding: 0;
+}
+
+.booked-overview-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-strong);
+  box-shadow: 0 14px 34px rgba(43, 54, 49, 0.08);
+}
+
+.booked-overview-main {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
   padding: 18px;
 }
 
@@ -2813,7 +2831,6 @@ img {
   gap: 14px;
 }
 
-.overview-map-card,
 .overview-slideshow-card,
 .overview-region-calendar,
 .overview-logistics {
@@ -2824,7 +2841,6 @@ img {
   overflow: hidden;
 }
 
-.overview-map-card,
 .overview-region-calendar,
 .overview-logistics {
   display: grid;
@@ -3085,12 +3101,184 @@ img {
 }
 
 .overview-map-card {
+  position: relative;
+  display: grid;
+  min-height: min(78vh, 760px);
   min-width: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: #d8ecef;
 }
 
 .overview-map-canvas {
-  aspect-ratio: 1 / 1;
-  min-height: min(72vw, 520px);
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.easy-overview-map-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 8;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.easy-map-search {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 360px;
+  flex: 1 1 220px;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(178, 190, 181, 0.9);
+  border-radius: 6px;
+  background: rgba(255, 253, 248, 0.94);
+  color: var(--muted);
+  padding: 0 10px;
+  box-shadow: 0 2px 8px rgba(43, 54, 49, 0.14);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.easy-map-search span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.easy-overview-map-toolbar select,
+.easy-overview-map-toolbar a,
+.easy-overview-map-toolbar button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(178, 190, 181, 0.9);
+  border-radius: 6px;
+  background: rgba(255, 253, 248, 0.94);
+  color: var(--ink);
+  padding: 0 10px;
+  box-shadow: 0 2px 8px rgba(43, 54, 49, 0.14);
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.easy-overview-map-toolbar button {
+  width: 36px;
+  padding: 0;
+}
+
+.easy-map-zoom {
+  position: absolute;
+  top: 54px;
+  left: 10px;
+  z-index: 7;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid rgba(178, 190, 181, 0.9);
+  border-radius: 4px;
+  background: rgba(255, 253, 248, 0.96);
+  box-shadow: 0 2px 8px rgba(43, 54, 49, 0.14);
+}
+
+.easy-map-zoom span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  color: var(--ink);
+  font-size: 1.12rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.easy-map-zoom span + span {
+  border-top: 1px solid rgba(178, 190, 181, 0.9);
+}
+
+.easy-map-caption {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 18px;
+  z-index: 7;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(178, 190, 181, 0.85);
+  border-radius: 10px;
+  background: rgba(255, 253, 248, 0.9);
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(43, 54, 49, 0.14);
+}
+
+.easy-map-caption h2 {
+  font-size: 1.1rem;
+}
+
+.easy-map-caption > span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.easy-map-attribution {
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  z-index: 8;
+  margin: 0;
+  background: rgba(255, 253, 248, 0.86);
+  color: #5f706a;
+  padding: 2px 5px;
+  font-size: 0.68rem;
+}
+
+@media (min-width: 1080px) {
+  .booked-overview-layout {
+    grid-template-columns: minmax(0, 0.82fr) minmax(420px, 1.18fr);
+    align-items: stretch;
+  }
+
+  .booked-overview-main {
+    max-height: calc(100vh - 118px);
+    overflow-y: auto;
+  }
+
+  .overview-map-card {
+    min-height: calc(100vh - 118px);
+  }
+}
+
+@media (max-width: 720px) {
+  .easy-overview-map-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .easy-map-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .overview-map-card {
+    min-height: 520px;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .easy-map-caption {
+    align-items: start;
+    flex-direction: column;
+  }
 }
 
 .overview-slideshow-card {

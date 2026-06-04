@@ -1539,34 +1539,38 @@ function Dashboard({
   if (bookedTripIds.has(trip.id)) {
     return (
       <section className="content-section peru-overview">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">{formatDate(trip.startDate)} to {formatDate(trip.endDate)}</p>
-            <h2>{trip.title}</h2>
+        <div className="booked-overview-layout">
+          <div className="booked-overview-main">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">{formatDate(trip.startDate)} to {formatDate(trip.endDate)}</p>
+                <h2>{trip.title}</h2>
+              </div>
+              <div className="button-row">
+                <button className="ghost-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(2)")?.click()}>
+                  Open itinerary
+                </button>
+                <button className="primary-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(3)")?.click()}>
+                  <CalendarDays size={17} aria-hidden="true" /> Open calendar
+                </button>
+              </div>
+            </div>
+            <div className="dashboard-grid peru-dashboard-grid">
+              <MetricCard label="Budget spent" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={formatLocalOnly(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
+              <MetricCard label="Days" value={String(totalDays)} detail={`${activities.length} stops`} icon={<CalendarDays size={18} />} />
+              <MetricCard label="Activities" value={String(activities.length)} detail={`${reservationCount} reservations / transport`} icon={<MapPin size={18} />} />
+              <MetricCard label="Saved links" value={String(savedLinks)} detail={`${trip.attachments.length} attachments`} icon={<Bookmark size={18} />} />
+              <MetricCard label="Booked" value={String(booked)} detail={`${incomplete} incomplete`} icon={<BadgeCheck size={18} />} />
+              <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
+            </div>
+            <div className="peru-overview-feature-grid">
+              <TripImageSlideshow trip={trip} activities={activities} />
+            </div>
+            <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
+            <OverviewChecklist trip={trip} checklistItems={checklistItems} addChecklistItem={addChecklistItem} toggleChecklistItem={toggleChecklistItem} deleteChecklistItem={deleteChecklistItem} />
           </div>
-          <div className="button-row">
-            <button className="ghost-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(2)")?.click()}>
-              Open itinerary
-            </button>
-            <button className="primary-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(3)")?.click()}>
-              <CalendarDays size={17} aria-hidden="true" /> Open calendar
-            </button>
-          </div>
-        </div>
-        <div className="dashboard-grid peru-dashboard-grid">
-          <MetricCard label="Budget spent" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={formatLocalOnly(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
-          <MetricCard label="Days" value={String(totalDays)} detail={`${activities.length} stops`} icon={<CalendarDays size={18} />} />
-          <MetricCard label="Activities" value={String(activities.length)} detail={`${reservationCount} reservations / transport`} icon={<MapPin size={18} />} />
-          <MetricCard label="Saved links" value={String(savedLinks)} detail={`${trip.attachments.length} attachments`} icon={<Bookmark size={18} />} />
-          <MetricCard label="Booked" value={String(booked)} detail={`${incomplete} incomplete`} icon={<BadgeCheck size={18} />} />
-          <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
-        </div>
-        <div className="peru-overview-feature-grid">
           <TripDestinationMap trip={trip} activities={activities} />
-          <TripImageSlideshow trip={trip} activities={activities} />
         </div>
-        <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
-        <OverviewChecklist trip={trip} checklistItems={checklistItems} addChecklistItem={addChecklistItem} toggleChecklistItem={toggleChecklistItem} deleteChecklistItem={deleteChecklistItem} />
       </section>
     );
   }
@@ -2130,15 +2134,34 @@ function TripDestinationMap({ trip, activities }: { trip: Trip; activities: Trip
 
   return (
     <article className="overview-map-card">
-      <div className="map-panel-header">
+      <div className="easy-overview-map-toolbar" aria-label={`${trip.country} map controls`}>
+        <label className="easy-map-search">
+          <Search size={15} aria-hidden="true" />
+          <span>Search places...</span>
+        </label>
+        <select aria-label="Map day filter" value="all" onChange={() => undefined}>
+          <option value="all">All Days</option>
+        </select>
+        <a href={googleMapUrl(destinationStops[0])} target="_blank" rel="noreferrer" title="Open first stop in maps">
+          <MapPin size={15} aria-hidden="true" />
+        </a>
+        <button type="button" title="Fit all markers">
+          <MapIcon size={15} aria-hidden="true" />
+        </button>
+      </div>
+      <MapTileCanvas trip={trip} stops={destinationStops} overviewMode className="overview-map-canvas" />
+      <div className="easy-map-zoom" aria-hidden="true">
+        <span>+</span>
+        <span>-</span>
+      </div>
+      <div className="easy-map-caption">
         <div>
           <p className="eyebrow">{trip.country} map</p>
           <h2>Destinations in {trip.country}</h2>
         </div>
         <span>{destinationStops.length} pins</span>
       </div>
-      <MapTileCanvas trip={trip} stops={destinationStops} forceCountryShape={trip.id === "portugal-2026"} className="overview-map-canvas" />
-      <p className="quiet-note">Only {trip.country} stops are shown here. International flight connection points are excluded, and each pin opens a map search.</p>
+      <p className="easy-map-attribution">Leaflet | OSM | CARTO</p>
     </article>
   );
 }
@@ -3085,28 +3108,36 @@ function getCoordinateBounds(stops: TripActivity[]) {
   );
 }
 
-function mapViewportBounds(trip: Trip, stops: TripActivity[], forceCountryShape = false) {
+function mapViewportBounds(trip: Trip, stops: TripActivity[], overviewMode = false) {
   const bounds = getCoordinateBounds(stops);
-  if (trip.id === "portugal-2026" && forceCountryShape) {
+  if (overviewMode && trip.id === "portugal-2026") {
     return {
-      minLat: Math.min(36.7, bounds.minLat),
-      maxLat: Math.max(42.35, bounds.maxLat),
-      minLng: Math.min(-9.85, bounds.minLng),
-      maxLng: Math.max(-6.05, bounds.maxLng),
+      minLat: Math.min(28, bounds.minLat),
+      maxLat: Math.max(66, bounds.maxLat),
+      minLng: Math.min(-42, bounds.minLng),
+      maxLng: Math.max(40, bounds.maxLng),
+    };
+  }
+  if (overviewMode && trip.id === "peru-2026") {
+    return {
+      minLat: Math.min(-24, bounds.minLat),
+      maxLat: Math.max(12, bounds.maxLat),
+      minLng: Math.min(-96, bounds.minLng),
+      maxLng: Math.max(-54, bounds.maxLng),
     };
   }
   return bounds;
 }
 
-function makeTileMap(trip: Trip, stops: TripActivity[], forceCountryShape = false) {
-  const bounds = mapViewportBounds(trip, stops, forceCountryShape);
+function makeTileMap(trip: Trip, stops: TripActivity[], overviewMode = false) {
+  const bounds = mapViewportBounds(trip, stops, overviewMode);
   const zoom = getMapZoom(bounds);
   const centerLat = (bounds.minLat + bounds.maxLat) / 2;
   const centerLng = (bounds.minLng + bounds.maxLng) / 2;
   const centerTileX = longitudeToTileX(centerLng, zoom);
   const centerTileY = latitudeToTileY(centerLat, zoom);
-  const tileColumns = forceCountryShape ? 4 : 5;
-  const tileRows = forceCountryShape ? 5 : 4;
+  const tileColumns = overviewMode ? 6 : 5;
+  const tileRows = overviewMode ? 5 : 4;
   const startTileX = Math.floor(centerTileX - tileColumns / 2);
   const startTileY = Math.floor(centerTileY - tileRows / 2);
   const maxTile = 2 ** zoom;
@@ -3118,7 +3149,7 @@ function makeTileMap(trip: Trip, stops: TripActivity[], forceCountryShape = fals
     const wrappedX = ((tileX % maxTile) + maxTile) % maxTile;
     return {
       key: `${zoom}-${tileX}-${tileY}`,
-      url: `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
+      url: `https://a.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${wrappedX}/${tileY}@2x.png`,
       left: `${(col / tileColumns) * 100}%`,
       top: `${(row / tileRows) * 100}%`,
       width: `${100 / tileColumns}%`,
@@ -3139,8 +3170,8 @@ function makeTileMap(trip: Trip, stops: TripActivity[], forceCountryShape = fals
   return { mapTiles, pins };
 }
 
-function MapTileCanvas({ trip, stops, forceCountryShape = false, className = "" }: { trip: Trip; stops: TripActivity[]; forceCountryShape?: boolean; className?: string }) {
-  const { mapTiles, pins } = makeTileMap(trip, stops, forceCountryShape);
+function MapTileCanvas({ trip, stops, overviewMode = false, className = "" }: { trip: Trip; stops: TripActivity[]; overviewMode?: boolean; className?: string }) {
+  const { mapTiles, pins } = makeTileMap(trip, stops, overviewMode);
   return (
     <div className={`map-canvas ${className}`.trim()}>
       <div className="map-tiles" aria-hidden="true">
