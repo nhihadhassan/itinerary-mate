@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
   DndContext,
   DragEndEvent,
@@ -2115,6 +2117,7 @@ function TripCalendar({ trip, activities, exchangeRate, openItineraryDay }: { tr
 }
 
 function TripDestinationMap({ trip, activities }: { trip: Trip; activities: TripActivity[] }) {
+  const [fitNonce, setFitNonce] = useState(0);
   const destinationStops = activities
     .filter((activity) =>
       activity.country === trip.country &&
@@ -2145,15 +2148,11 @@ function TripDestinationMap({ trip, activities }: { trip: Trip; activities: Trip
         <a href={googleMapUrl(destinationStops[0])} target="_blank" rel="noreferrer" title="Open first stop in maps">
           <MapPin size={15} aria-hidden="true" />
         </a>
-        <button type="button" title="Fit all markers">
+        <button type="button" title="Fit all markers" onClick={() => setFitNonce((value) => value + 1)}>
           <MapIcon size={15} aria-hidden="true" />
         </button>
       </div>
-      <MapTileCanvas trip={trip} stops={destinationStops} overviewMode className="overview-map-canvas" />
-      <div className="easy-map-zoom" aria-hidden="true">
-        <span>+</span>
-        <span>-</span>
-      </div>
+      <LeafletOverviewMap trip={trip} stops={destinationStops} fitNonce={fitNonce} />
       <div className="easy-map-caption">
         <div>
           <p className="eyebrow">{trip.country} map</p>
@@ -2164,6 +2163,95 @@ function TripDestinationMap({ trip, activities }: { trip: Trip; activities: Trip
       <p className="easy-map-attribution">Leaflet | OSM | CARTO</p>
     </article>
   );
+}
+
+function LeafletOverviewMap({ trip, stops, fitNonce }: { trip: Trip; stops: TripActivity[]; fitNonce: number }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markerLayerRef = useRef<L.LayerGroup | null>(null);
+  const stopsRef = useRef(stops);
+
+  useEffect(() => {
+    stopsRef.current = stops;
+  }, [stops]);
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    const initialView = overviewLeafletView(trip);
+    const map = L.map(containerRef.current, {
+      center: initialView.center,
+      zoom: initialView.zoom,
+      minZoom: 2,
+      maxZoom: 18,
+      zoomControl: true,
+      scrollWheelZoom: true,
+      worldCopyJump: true,
+    });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 19,
+    }).addTo(map);
+    markerLayerRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+    window.setTimeout(() => map.invalidateSize(), 80);
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markerLayerRef.current = null;
+    };
+  }, [trip.id]);
+
+  useEffect(() => {
+    const markerLayer = markerLayerRef.current;
+    if (!markerLayer) return;
+    markerLayer.clearLayers();
+    stops.forEach((activity, index) => {
+      if (activity.latitude === undefined || activity.longitude === undefined) return;
+      const marker = L.marker([activity.latitude, activity.longitude], {
+        icon: L.divIcon({
+          className: "",
+          html: `<span class="leaflet-trip-marker marker-${pinKind(activity)}">${index + 1}</span>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+          popupAnchor: [0, -18],
+        }),
+        title: activity.title,
+      });
+      marker.bindPopup(`
+        <strong>${escapeHtml(activity.title)}</strong>
+        <span>${escapeHtml(activity.city)}${activity.region ? `, ${escapeHtml(activity.region)}` : ""}</span>
+        <a href="${googleMapUrl(activity)}" target="_blank" rel="noreferrer">Open map search</a>
+      `);
+      markerLayer.addLayer(marker);
+    });
+  }, [stops]);
+
+  useEffect(() => {
+    if (!fitNonce || !mapRef.current) return;
+    fitLeafletStops(mapRef.current, stopsRef.current);
+  }, [fitNonce]);
+
+  return <div ref={containerRef} className="overview-map-canvas leaflet-overview-map" aria-label={`Interactive map of ${trip.country} destinations`} />;
+}
+
+function overviewLeafletView(trip: Trip): { center: L.LatLngExpression; zoom: number } {
+  if (trip.id === "portugal-2026") return { center: [43.2, -17.5], zoom: 3 };
+  if (trip.id === "peru-2026") return { center: [-9.2, -74.5], zoom: 5 };
+  return { center: [35.7, 139.7], zoom: 5 };
+}
+
+function fitLeafletStops(map: L.Map, stops: TripActivity[]) {
+  const latLngs = stops
+    .filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined)
+    .map((activity) => [activity.latitude!, activity.longitude!] as L.LatLngTuple);
+  if (!latLngs.length) return;
+  map.fitBounds(L.latLngBounds(latLngs).pad(0.24), { animate: true, maxZoom: 11 });
+}
+
+function escapeHtml(value = "") {
+  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] || char));
 }
 
 function TripImageSlideshow({ trip, activities }: { trip: Trip; activities: TripActivity[] }) {
