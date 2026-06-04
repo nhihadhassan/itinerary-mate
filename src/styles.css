@@ -1298,6 +1298,23 @@ img {
   box-shadow: 0 8px 22px rgba(43, 54, 49, 0.06);
 }
 
+.place-preview-map-link {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-strong) 86%, var(--soft));
+  color: var(--ink);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .place-preview-button {
   position: relative;
   display: grid;
@@ -1603,6 +1620,17 @@ img {
 
 .card-body {
   padding: 2px 2px 4px;
+}
+
+.place-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.place-card-actions .ghost-link-button {
+  min-height: 40px;
+  padding: 8px 10px;
 }
 
 .day-card {
@@ -2258,6 +2286,7 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  text-decoration: none;
 }
 
 .pin-hotel {
@@ -2315,18 +2344,50 @@ img {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
-.map-route-list div {
+.map-route-list div,
+.map-route-list a {
   display: grid;
   gap: 3px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--surface-strong) 80%, transparent);
+  color: inherit;
   padding: 10px;
+  text-decoration: none;
 }
 
 .map-route-list span {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.day-map-stack {
+  align-self: start;
+}
+
+.day-map-list {
+  display: grid;
+  gap: 12px;
+}
+
+.day-map-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-strong) 90%, var(--soft));
+  padding: 10px;
+}
+
+.day-map-canvas {
+  min-height: 220px;
+  aspect-ratio: 1 / 1;
+}
+
+.compact-map-route-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
 }
 
 .transit-panel {
@@ -3023,20 +3084,28 @@ img {
   background: var(--region-color, var(--trip-accent));
 }
 
+.overview-map-card {
+  min-width: 0;
+}
+
 .overview-map-canvas {
-  min-height: 330px;
+  aspect-ratio: 1 / 1;
+  min-height: min(72vw, 520px);
 }
 
 .overview-slideshow-card {
   position: relative;
-  min-height: 330px;
+  min-height: 0;
+  max-height: 520px;
+  aspect-ratio: 1 / 1;
   isolation: isolate;
+  overflow: hidden;
 }
 
 .overview-slideshow-card img {
   width: 100%;
   height: 100%;
-  min-height: 330px;
+  min-height: 0;
   object-fit: cover;
 }
 
@@ -3138,6 +3207,64 @@ img {
   margin-top: 16px;
 }
 
+.checklist-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.checklist-add-row label {
+  min-width: 0;
+}
+
+.checklist-add-row input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 12px;
+  font: inherit;
+}
+
+.checklist-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.checklist-tabs button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0 12px;
+  font-weight: 800;
+}
+
+.checklist-tabs button.active {
+  border-color: color-mix(in srgb, var(--trip-accent) 42%, var(--line));
+  background: color-mix(in srgb, var(--trip-accent-2) 34%, var(--surface-strong));
+  color: var(--ink);
+}
+
+.checklist-tabs span {
+  display: inline-grid;
+  min-width: 22px;
+  min-height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--trip-accent) 18%, transparent);
+  font-size: 0.78rem;
+}
+
 .checklist-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -3145,7 +3272,8 @@ img {
 }
 
 .checklist-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-height: 48px;
   align-items: center;
   gap: 10px;
@@ -3158,11 +3286,40 @@ img {
   line-height: 1.25;
 }
 
+.checklist-row label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
 .checklist-row input {
   width: 18px;
   height: 18px;
   accent-color: var(--trip-accent);
   flex: 0 0 auto;
+}
+
+.checklist-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.checklist-row.is-done span {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.checklist-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.checklist-actions .icon-button {
+  width: 36px;
+  min-height: 36px;
+  height: 36px;
 }
 
 .peru-dashboard-grid {
@@ -3193,10 +3350,13 @@ img {
 }
 
 .trip-peru .itinerary-card.no-real-image .card-body,
-.trip-portugal .itinerary-card.no-real-image .card-body,
+.trip-portugal .itinerary-card.no-real-image .card-body {
+  padding: 2px;
+}
+
 .trip-peru .browser-grid .place-card.no-real-image .card-body,
 .trip-portugal .browser-grid .place-card.no-real-image .card-body {
-  padding: 2px;
+  padding: 10px;
 }
 
 .trip-peru .itinerary-card.no-real-image .meta-chips span:nth-child(n + 4),
@@ -3837,6 +3997,11 @@ img {
   .overview-slideshow-card,
   .overview-slideshow-card img {
     min-height: 260px;
+  }
+
+  .overview-slideshow-card,
+  .overview-slideshow-card img {
+    max-height: 420px;
   }
 }
 

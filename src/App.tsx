@@ -92,6 +92,7 @@ interface BudgetRange {
 
 const MULTI_STORAGE_KEY = "itinerary-mate-v2";
 const LEGACY_JAPAN_STORAGE_KEY = "september-japan-planner-v1";
+const CHECKLIST_STORAGE_KEY = "itinerary-mate-checklists-v1";
 const tripOrder: TripId[] = ["japan-2026", "peru-2026", "portugal-2026"];
 const calendarTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
 const bookedTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
@@ -116,6 +117,14 @@ const categoryOptions: TripCategory[] = [
   "Transit",
   "Note",
 ];
+
+interface ChecklistItem {
+  id: string;
+  tripId: TripId;
+  text: string;
+  isDone: boolean;
+  archivedAt?: string;
+}
 
 function placeholderFor(text: string) {
   const hue = Math.abs([...text].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % 360;
@@ -544,6 +553,11 @@ function copyText(text: string) {
   return navigator.clipboard.writeText(text);
 }
 
+function googleMapUrl(activity: Pick<TripActivity, "googleMapsQuery" | "address" | "title" | "city" | "country">) {
+  const query = activity.googleMapsQuery || activity.address || [activity.title, activity.city, activity.country].filter(Boolean).join(" ");
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
 function dayScore(items: TripActivity[]) {
   const fullDayCount = items.filter((item) => /full day|half day/i.test(item.duration)).length;
   const travelHits = items.filter((item) => /hr|hour|flight|train|airport|transfer/i.test(`${item.travelTimeFromPrevious} ${item.transportMode} ${item.duration}`)).length;
@@ -572,6 +586,7 @@ function App() {
   const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(() => new Set());
   const [loadedImageIds, setLoadedImageIds] = useState<Set<string>>(() => new Set());
   const [updateReady, setUpdateReady] = useState(false);
+  const [checklists, setChecklists] = useState<Record<TripId, ChecklistItem[]>>(() => parseStored<Record<TripId, ChecklistItem[]>>(CHECKLIST_STORAGE_KEY) || makeDefaultChecklistState());
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -665,6 +680,10 @@ function App() {
     setSaveStatus(`Saved locally ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
   }, [state]);
 
+  useEffect(() => {
+    localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify(checklists));
+  }, [checklists]);
+
   function updateState(patch: Partial<MultiTripState>) {
     setState((current) => ({ ...current, ...patch }));
   }
@@ -721,6 +740,33 @@ function App() {
         [current.activeTripId]: nextTrip,
       },
     }));
+  }
+
+  function updateActiveChecklist(nextItems: ChecklistItem[]) {
+    setChecklists((current) => ({ ...current, [activeTrip.id]: nextItems }));
+    setSaveStatus(`Saved checklist ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
+  }
+
+  function addChecklistItem(text: string) {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+    updateActiveChecklist([
+      {
+        id: `${activeTrip.id}-task-${Date.now()}`,
+        tripId: activeTrip.id,
+        text: cleanText,
+        isDone: false,
+      },
+      ...(checklists[activeTrip.id] || []),
+    ]);
+  }
+
+  function toggleChecklistItem(id: string, isDone: boolean) {
+    updateActiveChecklist((checklists[activeTrip.id] || []).map((item) => item.id === id ? { ...item, isDone, archivedAt: isDone ? new Date().toISOString() : undefined } : item));
+  }
+
+  function deleteChecklistItem(id: string) {
+    updateActiveChecklist((checklists[activeTrip.id] || []).filter((item) => item.id !== id));
   }
 
   function updateActivity(id: string, patch: Partial<TripActivity>) {
@@ -1115,6 +1161,10 @@ function App() {
               budget={budget}
               exchangeRate={activeExchangeRate}
               routeSuggestions={routeSuggestions}
+              checklistItems={checklists[activeTrip.id] || []}
+              addChecklistItem={addChecklistItem}
+              toggleChecklistItem={toggleChecklistItem}
+              deleteChecklistItem={deleteChecklistItem}
             />
           )}
 
@@ -1136,12 +1186,16 @@ function App() {
                   exchangeRate={activeExchangeRate}
                 />
               </DndContext>
-              <TripMapPanel
-                trip={activeTrip}
-                activities={selectedDayActivities.length ? selectedDayActivities : filteredActivities}
-                selectedDay={selectedDay}
-                onAddPlace={addOpenMapPlace}
-              />
+              {selectedDay === "All" ? (
+                <TripDayMapStack trip={activeTrip} activities={filteredActivities} />
+              ) : (
+                <TripMapPanel
+                  trip={activeTrip}
+                  activities={selectedDayActivities.length ? selectedDayActivities : filteredActivities}
+                  selectedDay={selectedDay}
+                  onAddPlace={addOpenMapPlace}
+                />
+              )}
             </div>
           )}
 
@@ -1454,7 +1508,27 @@ function FilterBar(props: {
   );
 }
 
-function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }: { trip: Trip; activities: TripActivity[]; budget: ReturnType<typeof makeBudget>; exchangeRate: number; routeSuggestions: RouteSuggestion[] }) {
+function Dashboard({
+  trip,
+  activities,
+  budget,
+  exchangeRate,
+  routeSuggestions,
+  checklistItems,
+  addChecklistItem,
+  toggleChecklistItem,
+  deleteChecklistItem,
+}: {
+  trip: Trip;
+  activities: TripActivity[];
+  budget: ReturnType<typeof makeBudget>;
+  exchangeRate: number;
+  routeSuggestions: RouteSuggestion[];
+  checklistItems: ChecklistItem[];
+  addChecklistItem: (text: string) => void;
+  toggleChecklistItem: (id: string, isDone: boolean) => void;
+  deleteChecklistItem: (id: string) => void;
+}) {
   const booked = activities.filter((activity) => activity.isBooked).length + trip.flights.filter((flight) => flight.status === "booked" || flight.status === "manual / not live yet").length;
   const incomplete = activities.filter((activity) => !activity.isCompleted).length;
   const nextFlight = trip.flights.find((flight) => new Date(flight.departureTime).getTime() >= Date.now()) || trip.flights[0];
@@ -1492,7 +1566,7 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
           <TripImageSlideshow trip={trip} activities={activities} />
         </div>
         <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
-        <OverviewChecklist trip={trip} />
+        <OverviewChecklist trip={trip} checklistItems={checklistItems} addChecklistItem={addChecklistItem} toggleChecklistItem={toggleChecklistItem} deleteChecklistItem={deleteChecklistItem} />
       </section>
     );
   }
@@ -1547,7 +1621,7 @@ function Dashboard({ trip, activities, budget, exchangeRate, routeSuggestions }:
 
       <SuggestionList suggestions={routeSuggestions.slice(0, 4)} />
       <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
-      <OverviewChecklist trip={trip} />
+      <OverviewChecklist trip={trip} checklistItems={checklistItems} addChecklistItem={addChecklistItem} toggleChecklistItem={toggleChecklistItem} deleteChecklistItem={deleteChecklistItem} />
     </section>
   );
 }
@@ -2054,52 +2128,6 @@ function TripDestinationMap({ trip, activities }: { trip: Trip; activities: Trip
     return <EmptyState title={`No ${trip.country} map pins yet`} body={`${trip.country} destinations with saved coordinates will appear here.`} />;
   }
 
-  const bounds = destinationStops.reduce(
-    (acc, activity) => ({
-      minLat: Math.min(acc.minLat, activity.latitude!),
-      maxLat: Math.max(acc.maxLat, activity.latitude!),
-      minLng: Math.min(acc.minLng, activity.longitude!),
-      maxLng: Math.max(acc.maxLng, activity.longitude!),
-    }),
-    { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 },
-  );
-  const zoom = getMapZoom(bounds);
-  const centerLat = (bounds.minLat + bounds.maxLat) / 2;
-  const centerLng = (bounds.minLng + bounds.maxLng) / 2;
-  const centerTileX = longitudeToTileX(centerLng, zoom);
-  const centerTileY = latitudeToTileY(centerLat, zoom);
-  const tileColumns = 5;
-  const tileRows = 4;
-  const startTileX = Math.floor(centerTileX - tileColumns / 2);
-  const startTileY = Math.floor(centerTileY - tileRows / 2);
-  const maxTile = 2 ** zoom;
-  const mapTiles = Array.from({ length: tileColumns * tileRows }, (_, index) => {
-    const col = index % tileColumns;
-    const row = Math.floor(index / tileColumns);
-    const tileX = startTileX + col;
-    const tileY = clamp(startTileY + row, 0, maxTile - 1);
-    const wrappedX = ((tileX % maxTile) + maxTile) % maxTile;
-    return {
-      key: `${zoom}-${tileX}-${tileY}`,
-      url: `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
-      left: `${(col / tileColumns) * 100}%`,
-      top: `${(row / tileRows) * 100}%`,
-      width: `${100 / tileColumns}%`,
-      height: `${100 / tileRows}%`,
-    };
-  });
-  const pins = destinationStops.map((activity, index) => {
-    const projectedX = longitudeToTileX(activity.longitude!, zoom);
-    const projectedY = latitudeToTileY(activity.latitude!, zoom);
-    return {
-      activity,
-      index,
-      x: Math.max(7, Math.min(93, ((projectedX - startTileX) / tileColumns) * 100)),
-      y: Math.max(7, Math.min(91, ((projectedY - startTileY) / tileRows) * 100)),
-      kind: pinKind(activity),
-    };
-  });
-
   return (
     <article className="overview-map-card">
       <div className="map-panel-header">
@@ -2109,25 +2137,8 @@ function TripDestinationMap({ trip, activities }: { trip: Trip; activities: Trip
         </div>
         <span>{destinationStops.length} pins</span>
       </div>
-      <div className="map-canvas overview-map-canvas">
-        <div className="map-tiles" aria-hidden="true">
-          {mapTiles.map((tile) => (
-            <img key={tile.key} src={tile.url} alt="" loading="lazy" style={{ left: tile.left, top: tile.top, width: tile.width, height: tile.height }} />
-          ))}
-        </div>
-        {pins.map((pin) => (
-          <button
-            key={pin.activity.id}
-            type="button"
-            className={`map-pin pin-${pin.kind}`}
-            style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
-            title={pin.activity.title}
-          >
-            {pin.index + 1}
-          </button>
-        ))}
-      </div>
-      <p className="quiet-note">Only {trip.country} stops are shown here. International flight connection points are intentionally excluded.</p>
+      <MapTileCanvas trip={trip} stops={destinationStops} forceCountryShape={trip.id === "portugal-2026"} className="overview-map-canvas" />
+      <p className="quiet-note">Only {trip.country} stops are shown here. International flight connection points are excluded, and each pin opens a map search.</p>
     </article>
   );
 }
@@ -2279,8 +2290,32 @@ function OverviewLogistics({ trip, routeSuggestions, exchangeRate }: { trip: Tri
   );
 }
 
-function OverviewChecklist({ trip }: { trip: Trip }) {
-  const checklist = tripChecklistItems(trip);
+function OverviewChecklist({
+  trip,
+  checklistItems,
+  addChecklistItem,
+  toggleChecklistItem,
+  deleteChecklistItem,
+}: {
+  trip: Trip;
+  checklistItems: ChecklistItem[];
+  addChecklistItem: (text: string) => void;
+  toggleChecklistItem: (id: string, isDone: boolean) => void;
+  deleteChecklistItem: (id: string) => void;
+}) {
+  const [text, setText] = useState("");
+  const [tab, setTab] = useState<"active" | "archive">("active");
+  const activeItems = checklistItems.filter((item) => !item.isDone);
+  const archivedItems = checklistItems.filter((item) => item.isDone);
+  const visibleItems = tab === "active" ? activeItems : archivedItems;
+
+  function submitItem(event: FormEvent) {
+    event.preventDefault();
+    addChecklistItem(text);
+    setText("");
+    setTab("active");
+  }
+
   return (
     <section className="overview-logistics overview-checklist">
       <div className="section-heading">
@@ -2290,16 +2325,56 @@ function OverviewChecklist({ trip }: { trip: Trip }) {
         </div>
         <Clipboard size={20} aria-hidden="true" />
       </div>
-      <div className="checklist-grid">
-        {checklist.map((item) => (
-          <label className="checklist-row" key={item}>
-            <input type="checkbox" />
-            <span>{item}</span>
-          </label>
-        ))}
+      <form className="checklist-add-row" onSubmit={submitItem}>
+        <label>
+          <span className="sr-only">Add checklist item</span>
+          <input value={text} onChange={(event) => setText(event.target.value)} placeholder={`Add a ${trip.country} task`} />
+        </label>
+        <button className="primary-button" type="submit"><Plus size={16} aria-hidden="true" /> Add</button>
+      </form>
+      <div className="checklist-tabs" role="tablist" aria-label={`${trip.title} checklist views`}>
+        <button type="button" className={tab === "active" ? "active" : ""} onClick={() => setTab("active")}>Active <span>{activeItems.length}</span></button>
+        <button type="button" className={tab === "archive" ? "active" : ""} onClick={() => setTab("archive")}>Archive <span>{archivedItems.length}</span></button>
       </div>
+      {visibleItems.length ? (
+        <div className="checklist-grid">
+          {visibleItems.map((item) => (
+            <article className={`checklist-row ${item.isDone ? "is-done" : ""}`} key={item.id}>
+              <label>
+                <input type="checkbox" checked={item.isDone} onChange={(event) => toggleChecklistItem(item.id, event.target.checked)} />
+                <span>{item.text}</span>
+              </label>
+              <div className="checklist-actions">
+                {item.isDone && (
+                  <button type="button" className="icon-button" onClick={() => toggleChecklistItem(item.id, false)} title="Restore task">
+                    <RotateCcw size={15} aria-hidden="true" />
+                  </button>
+                )}
+                <button type="button" className="icon-button" onClick={() => deleteChecklistItem(item.id)} title="Delete task">
+                  <Trash2 size={15} aria-hidden="true" />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title={tab === "active" ? "Nothing active" : "Archive is empty"} body={tab === "active" ? "Add a task above or restore one from Archive." : "Completed tasks will move here."} />
+      )}
     </section>
   );
+}
+
+function makeDefaultChecklistState(): Record<TripId, ChecklistItem[]> {
+  const trips = [buildJapanTrip(), peruTrip, portugalTrip];
+  return trips.reduce((acc, trip) => {
+    acc[trip.id] = tripChecklistItems(trip).map((text, index) => ({
+      id: `${trip.id}-default-${index + 1}`,
+      tripId: trip.id,
+      text,
+      isDone: false,
+    }));
+    return acc;
+  }, {} as Record<TripId, ChecklistItem[]>);
 }
 
 function tripChecklistItems(trip: Trip) {
@@ -2926,6 +3001,11 @@ function ActivityCard({
           <span><BadgeCheck size={14} /> {activityStatusLabel(activity)}</span>
           {variant === "full" && <span><Sparkles size={14} /> Priority {activity.priority}</span>}
         </div>
+        <div className="place-card-actions">
+          <a className="ghost-link-button" href={googleMapUrl(activity)} target="_blank" rel="noreferrer">
+            <MapIcon size={16} aria-hidden="true" /> Open Map
+          </a>
+        </div>
         {expanded && (
           <div className="expanded-panel">
             <div className="edit-grid">
@@ -2993,6 +3073,98 @@ function pinKind(activity: TripActivity) {
   return "attraction";
 }
 
+function getCoordinateBounds(stops: TripActivity[]) {
+  return stops.reduce(
+    (acc, activity) => ({
+      minLat: Math.min(acc.minLat, activity.latitude!),
+      maxLat: Math.max(acc.maxLat, activity.latitude!),
+      minLng: Math.min(acc.minLng, activity.longitude!),
+      maxLng: Math.max(acc.maxLng, activity.longitude!),
+    }),
+    { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 },
+  );
+}
+
+function mapViewportBounds(trip: Trip, stops: TripActivity[], forceCountryShape = false) {
+  const bounds = getCoordinateBounds(stops);
+  if (trip.id === "portugal-2026" && forceCountryShape) {
+    return {
+      minLat: Math.min(36.7, bounds.minLat),
+      maxLat: Math.max(42.35, bounds.maxLat),
+      minLng: Math.min(-9.85, bounds.minLng),
+      maxLng: Math.max(-6.05, bounds.maxLng),
+    };
+  }
+  return bounds;
+}
+
+function makeTileMap(trip: Trip, stops: TripActivity[], forceCountryShape = false) {
+  const bounds = mapViewportBounds(trip, stops, forceCountryShape);
+  const zoom = getMapZoom(bounds);
+  const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+  const centerLng = (bounds.minLng + bounds.maxLng) / 2;
+  const centerTileX = longitudeToTileX(centerLng, zoom);
+  const centerTileY = latitudeToTileY(centerLat, zoom);
+  const tileColumns = forceCountryShape ? 4 : 5;
+  const tileRows = forceCountryShape ? 5 : 4;
+  const startTileX = Math.floor(centerTileX - tileColumns / 2);
+  const startTileY = Math.floor(centerTileY - tileRows / 2);
+  const maxTile = 2 ** zoom;
+  const mapTiles = Array.from({ length: tileColumns * tileRows }, (_, index) => {
+    const col = index % tileColumns;
+    const row = Math.floor(index / tileColumns);
+    const tileX = startTileX + col;
+    const tileY = clamp(startTileY + row, 0, maxTile - 1);
+    const wrappedX = ((tileX % maxTile) + maxTile) % maxTile;
+    return {
+      key: `${zoom}-${tileX}-${tileY}`,
+      url: `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
+      left: `${(col / tileColumns) * 100}%`,
+      top: `${(row / tileRows) * 100}%`,
+      width: `${100 / tileColumns}%`,
+      height: `${100 / tileRows}%`,
+    };
+  });
+  const pins = stops.map((activity, index) => {
+    const projectedX = longitudeToTileX(activity.longitude!, zoom);
+    const projectedY = latitudeToTileY(activity.latitude!, zoom);
+    return {
+      activity,
+      index,
+      x: Math.max(7, Math.min(93, ((projectedX - startTileX) / tileColumns) * 100)),
+      y: Math.max(7, Math.min(91, ((projectedY - startTileY) / tileRows) * 100)),
+      kind: pinKind(activity),
+    };
+  });
+  return { mapTiles, pins };
+}
+
+function MapTileCanvas({ trip, stops, forceCountryShape = false, className = "" }: { trip: Trip; stops: TripActivity[]; forceCountryShape?: boolean; className?: string }) {
+  const { mapTiles, pins } = makeTileMap(trip, stops, forceCountryShape);
+  return (
+    <div className={`map-canvas ${className}`.trim()}>
+      <div className="map-tiles" aria-hidden="true">
+        {mapTiles.map((tile) => (
+          <img key={tile.key} src={tile.url} alt="" loading="lazy" style={{ left: tile.left, top: tile.top, width: tile.width, height: tile.height }} />
+        ))}
+      </div>
+      {pins.map((pin) => (
+        <a
+          key={pin.activity.id}
+          className={`map-pin pin-${pin.kind}`}
+          style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+          title={pin.activity.title}
+          href={googleMapUrl(pin.activity)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {pin.index + 1}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function isLongDistanceTransitDay(trip: Trip, activities: TripActivity[], selectedDay: number | "All") {
   if (!bookedTripIds.has(trip.id)) return false;
   const countries = new Set(activities.map((activity) => activity.country).filter(Boolean));
@@ -3022,7 +3194,7 @@ function TripMapPanel({
   const stops = activities
     .filter((activity) => activity.latitude !== undefined || activity.googleMapsQuery || activity.address)
     .slice(0, 14);
-  const dayLabel = selectedDay === "All" ? "all visible days" : `Day ${selectedDay}`;
+  const dayLabel = selectedDay === "All" ? "All Visible Days" : `Day ${selectedDay}`;
 
   if (isLongDistanceTransitDay(trip, stops, selectedDay)) {
     return <TransitRoutePanel trip={trip} stops={stops} selectedDay={selectedDay} dayLabel={dayLabel} />;
@@ -3145,15 +3317,17 @@ function TripMapPanel({
           <polyline points={routePoints} />
         </svg>
         {pins.map((pin) => (
-          <button
+          <a
             key={pin.activity.id}
-            type="button"
             className={`map-pin pin-${pin.kind}`}
             style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
             title={pin.activity.title}
+            href={googleMapUrl(pin.activity)}
+            target="_blank"
+            rel="noreferrer"
           >
             {pin.index + 1}
-          </button>
+          </a>
         ))}
       </div>
       <div className="map-legend" aria-label="Map pin legend">
@@ -3171,6 +3345,68 @@ function TripMapPanel({
         ))}
       </div>
       <p className="quiet-note">OpenStreetMap tiles with saved coordinates and stop order. Route timing uses imported notes or local estimates; no Google Maps API is loaded.</p>
+    </aside>
+  );
+}
+
+function TripDayMapStack({ trip, activities }: { trip: Trip; activities: TripActivity[] }) {
+  const dayGroups = activities.reduce<Record<number, TripActivity[]>>((acc, activity) => {
+    if (
+      activity.country !== trip.country ||
+      activity.latitude === undefined ||
+      activity.longitude === undefined ||
+      activity.type === "flight" ||
+      activity.type === "transport" ||
+      activity.category === "Flight" ||
+      activity.category === "Transit"
+    ) {
+      return acc;
+    }
+    acc[activity.day] ||= [];
+    acc[activity.day].push(activity);
+    return acc;
+  }, {});
+  const mappedDays = Object.entries(dayGroups)
+    .map(([day, stops]) => ({ day: Number(day), stops: stops.slice(0, 8) }))
+    .filter(({ stops }) => stops.length >= 2)
+    .sort((a, b) => a.day - b.day);
+
+  if (!mappedDays.length) {
+    return <TripMapPanel trip={trip} activities={activities} selectedDay="All" onAddPlace={(_place, _day) => undefined} />;
+  }
+
+  return (
+    <aside className="map-panel day-map-stack" aria-label={`${trip.title} day maps`}>
+      <div className="map-panel-header">
+        <div>
+          <p className="eyebrow">Open map</p>
+          <h2>Daily Map Views</h2>
+        </div>
+        <span>{mappedDays.length} days</span>
+      </div>
+      <div className="day-map-list">
+        {mappedDays.map(({ day, stops }) => (
+          <article className="day-map-card" key={day}>
+            <div className="places-day-heading">
+              <div>
+                <p className="eyebrow">Day {day}</p>
+                <h3>{stops[0]?.city || trip.country}</h3>
+              </div>
+              <span>{stops.length} pins</span>
+            </div>
+            <MapTileCanvas trip={trip} stops={stops} className="day-map-canvas" />
+            <div className="map-route-list compact-map-route-list">
+              {stops.slice(0, 4).map((activity, index) => (
+                <a key={activity.id} href={googleMapUrl(activity)} target="_blank" rel="noreferrer">
+                  <strong>{index + 1}. {activity.title}</strong>
+                  <span>{activity.city} · {routeTimeLabel(activity) || "travel time TBD"}</span>
+                </a>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="quiet-note">Each daily map shows local sightseeing pins only. Flight and long transfer days stay out of these views.</p>
     </aside>
   );
 }
@@ -3288,6 +3524,9 @@ function PlacePreviewCard({
           {localCostSubtext && <small>{localCostSubtext}</small>}
         </div>
       </button>
+      <a className="place-preview-map-link" href={googleMapUrl(activity)} target="_blank" rel="noreferrer">
+        <MapIcon size={15} aria-hidden="true" /> Open Map
+      </a>
     </article>
   );
 }
