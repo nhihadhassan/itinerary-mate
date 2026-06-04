@@ -100,7 +100,6 @@ const baseNavItems: Array<{ id: AppView; label: string }> = [
   { id: "dashboard", label: "Overview" },
   { id: "itinerary", label: "Itinerary" },
   { id: "places", label: "Explore" },
-  { id: "discovery", label: "Discovery" },
   { id: "budget", label: "Budget" },
   { id: "maps", label: "Map / Export" },
   { id: "more", label: "More" },
@@ -988,7 +987,15 @@ function App() {
           {!bookedTripIds.has(activeTrip.id) && <p>{activeTrip.description}</p>}
         </div>
         <div className="topbar-actions">
-          <TripSwitcher activeTripId={state.activeTripId} setActiveTripId={(activeTripId) => updateState({ activeTripId })} />
+          <TripSwitcher
+            activeTripId={state.activeTripId}
+            activeView={activeView}
+            setActiveTripId={(activeTripId) => {
+              updateState({ activeTripId });
+              if (activeView === "discovery") setActiveView("itinerary");
+            }}
+            openDiscovery={() => setActiveView("discovery")}
+          />
           <ThemeToggle preference={state.themePreference} resolvedTheme={resolvedTheme} setPreference={(themePreference) => updateState({ themePreference })} />
           {updateReady && (
             <button className="update-button" type="button" onClick={() => window.location.reload()}>
@@ -1267,7 +1274,17 @@ function makeRouteSuggestions(trip: Trip, activities: TripActivity[]): RouteSugg
   return suggestions;
 }
 
-function TripSwitcher({ activeTripId, setActiveTripId }: { activeTripId: TripId; setActiveTripId: (id: TripId) => void }) {
+function TripSwitcher({
+  activeTripId,
+  activeView,
+  setActiveTripId,
+  openDiscovery,
+}: {
+  activeTripId: TripId;
+  activeView: AppView;
+  setActiveTripId: (id: TripId) => void;
+  openDiscovery: () => void;
+}) {
   const labels: Record<TripId, string> = {
     "japan-2026": "Japan Trip",
     "peru-2026": "Peru Trip",
@@ -1276,10 +1293,13 @@ function TripSwitcher({ activeTripId, setActiveTripId }: { activeTripId: TripId;
   return (
     <div className="trip-switcher" aria-label="Trip switcher">
       {tripOrder.map((tripId) => (
-        <button key={tripId} type="button" className={activeTripId === tripId ? "active" : ""} onClick={() => setActiveTripId(tripId)}>
+        <button key={tripId} type="button" className={activeTripId === tripId && activeView !== "discovery" ? "active" : ""} onClick={() => setActiveTripId(tripId)}>
           {labels[tripId]}
         </button>
       ))}
+      <button type="button" className={activeView === "discovery" ? "active discovery-global-button" : "discovery-global-button"} onClick={openDiscovery}>
+        Discovery
+      </button>
     </div>
   );
 }
