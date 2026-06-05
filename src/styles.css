@@ -3662,21 +3662,25 @@ img {
 }
 
 .booked-dashboard-grid .booked-overview-main {
-  gap: 16px;
+  gap: 12px;
   padding: 0;
 }
 
 .booked-overview-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  gap: 12px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--trip-accent-2) 38%, var(--surface-strong)), var(--surface-strong) 62%),
     var(--surface-strong);
-  padding: 18px;
-  box-shadow: 0 14px 34px rgba(43, 54, 49, 0.08);
+  padding: 16px;
+  box-shadow: 0 10px 26px rgba(43, 54, 49, 0.07);
+}
+
+.booked-overview-hero > div:first-child {
+  min-width: 0;
 }
 
 .booked-overview-hero h2 {
@@ -3714,22 +3718,44 @@ img {
 
 .booked-dashboard-grid .peru-dashboard-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .booked-dashboard-grid .peru-dashboard-grid .metric-card {
-  min-height: 104px;
-  padding: 13px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 2px 10px;
+  min-height: 86px;
+  align-content: center;
+  padding: 11px;
+}
+
+.booked-dashboard-grid .peru-dashboard-grid .metric-icon {
+  grid-row: 1 / span 3;
+  inline-size: 32px;
+  block-size: 32px;
+}
+
+.booked-dashboard-grid .peru-dashboard-grid .eyebrow,
+.booked-dashboard-grid .peru-dashboard-grid .metric-card strong,
+.booked-dashboard-grid .peru-dashboard-grid .metric-card span {
+  min-width: 0;
+  grid-column: 2;
 }
 
 .booked-dashboard-grid .peru-dashboard-grid .metric-card strong {
-  font-size: 1.18rem;
+  font-size: 1.08rem;
+  line-height: 1.12;
+}
+
+.booked-dashboard-grid .peru-dashboard-grid .metric-card span {
+  font-size: 0.8rem;
+  line-height: 1.25;
 }
 
 .booked-overview-card-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
   align-items: stretch;
 }
 
@@ -3737,15 +3763,24 @@ img {
   min-width: 0;
 }
 
-.booked-overview-card-grid .overview-map-card,
-.booked-overview-card-grid .overview-slideshow-card {
-  grid-column: span 6;
+.overview-feature-pair {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
 }
 
-.booked-overview-card-grid .overview-region-calendar,
-.booked-overview-card-grid .overview-highlights-card,
+.booked-overview-card-grid .overview-region-calendar {
+  grid-column: 1 / span 4;
+}
+
+.booked-overview-card-grid .overview-highlights-card {
+  grid-column: 5 / span 5;
+}
+
 .booked-overview-card-grid .overview-alerts-card {
-  grid-column: span 6;
+  grid-column: 10 / span 3;
 }
 
 .booked-overview-card-grid .overview-logistics:not(.overview-highlights-card):not(.overview-alerts-card),
@@ -3755,21 +3790,26 @@ img {
 
 .booked-overview-card-grid .overview-map-card {
   position: relative;
-  min-height: 520px;
-  height: auto;
+  top: auto;
+  min-height: 0;
+  height: clamp(460px, 39vw, 560px);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: 0 14px 34px rgba(43, 54, 49, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(43, 54, 49, 0.07);
 }
 
 .booked-overview-card-grid .overview-map-canvas {
-  min-height: 520px;
+  min-height: 0;
+  height: 100%;
 }
 
 .booked-overview-card-grid .overview-slideshow-card {
-  min-height: 520px;
+  min-height: 0;
+  height: clamp(460px, 39vw, 560px);
   max-height: none;
-  box-shadow: 0 14px 34px rgba(43, 54, 49, 0.08);
+  aspect-ratio: auto;
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(43, 54, 49, 0.07);
 }
 
 .overview-highlight-grid {
@@ -3784,7 +3824,7 @@ img {
 }
 
 .booked-overview-card-grid .overview-logistics {
-  padding: 16px;
+  padding: 14px;
 }
 
 .booked-overview-card-grid .overview-checklist {
@@ -3793,16 +3833,25 @@ img {
 
 @media (min-width: 920px) {
   .booked-overview-hero {
-    grid-template-columns: minmax(0, 1fr) minmax(240px, auto);
-    align-items: end;
+    grid-template-columns: minmax(420px, 1fr) minmax(340px, 0.72fr);
+    grid-template-areas:
+      "copy route"
+      "copy actions";
+    align-items: center;
   }
 
-  .booked-overview-hero .button-row {
+  .booked-overview-hero > div:first-child {
+    grid-area: copy;
+  }
+
+  .booked-overview-hero .overview-route-strip {
+    grid-area: route;
     justify-content: end;
   }
 
-  .overview-route-strip {
-    grid-column: 1 / -1;
+  .booked-overview-hero .button-row {
+    grid-area: actions;
+    justify-content: end;
   }
 }
 
@@ -3817,11 +3866,19 @@ img {
   .booked-overview-card-grid .overview-highlights-card,
   .booked-overview-card-grid .overview-alerts-card {
     grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  .overview-feature-pair {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 720px) {
-  .booked-dashboard-grid .peru-dashboard-grid,
+  .booked-dashboard-grid .peru-dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .overview-highlight-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3830,10 +3887,21 @@ img {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .overview-feature-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .booked-overview-card-grid .overview-map-card,
   .booked-overview-card-grid .overview-map-canvas,
   .booked-overview-card-grid .overview-slideshow-card {
-    min-height: 420px;
+    min-height: 380px;
+    height: 380px;
+  }
+}
+
+@media (max-width: 360px) {
+  .booked-dashboard-grid .peru-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

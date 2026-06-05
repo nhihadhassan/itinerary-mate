@@ -1575,8 +1575,10 @@ function Dashboard({
               <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
             </div>
             <div className="booked-overview-card-grid">
-              <TripDestinationMap trip={trip} activities={activities} />
-              <TripImageSlideshow trip={trip} activities={activities} />
+              <div className="overview-feature-pair">
+                <TripDestinationMap trip={trip} activities={activities} />
+                <TripImageSlideshow trip={trip} activities={activities} />
+              </div>
               <TripRegionCalendar trip={trip} compact />
               <section className="overview-logistics overview-highlights-card">
                 <div className="section-heading">
