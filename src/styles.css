@@ -371,6 +371,14 @@ img {
   max-width: none;
 }
 
+.main-grid.booked-dashboard-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.main-grid.booked-dashboard-grid .content-stack {
+  max-width: none;
+}
+
 .side-panel,
 .content-stack,
 .view-stack {
@@ -3630,6 +3638,203 @@ img {
 
 .peru-dashboard-grid .metric-card strong {
   font-size: 1.35rem;
+}
+
+.booked-dashboard-grid .peru-overview {
+  padding: 0;
+}
+
+.main-grid.booked-dashboard-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.main-grid.booked-dashboard-grid .content-stack {
+  grid-column: 1 / -1;
+  max-width: none;
+}
+
+.booked-dashboard-grid .booked-overview-layout {
+  grid-template-columns: minmax(0, 1fr);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.booked-dashboard-grid .booked-overview-main {
+  gap: 16px;
+  padding: 0;
+}
+
+.booked-overview-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--trip-accent-2) 38%, var(--surface-strong)), var(--surface-strong) 62%),
+    var(--surface-strong);
+  padding: 18px;
+  box-shadow: 0 14px 34px rgba(43, 54, 49, 0.08);
+}
+
+.booked-overview-hero h2 {
+  margin-top: 3px;
+  font-size: 1.8rem;
+  line-height: 1.08;
+}
+
+.booked-overview-hero p:not(.eyebrow) {
+  max-width: 72ch;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.overview-route-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.overview-route-strip span {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--trip-accent) 22%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--trip-accent-2) 46%, var(--surface-strong));
+  color: var(--ink);
+  padding: 0 11px;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.booked-dashboard-grid .peru-dashboard-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.booked-dashboard-grid .peru-dashboard-grid .metric-card {
+  min-height: 104px;
+  padding: 13px;
+}
+
+.booked-dashboard-grid .peru-dashboard-grid .metric-card strong {
+  font-size: 1.18rem;
+}
+
+.booked-overview-card-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.booked-overview-card-grid > * {
+  min-width: 0;
+}
+
+.booked-overview-card-grid .overview-map-card,
+.booked-overview-card-grid .overview-slideshow-card {
+  grid-column: span 6;
+}
+
+.booked-overview-card-grid .overview-region-calendar,
+.booked-overview-card-grid .overview-highlights-card,
+.booked-overview-card-grid .overview-alerts-card {
+  grid-column: span 6;
+}
+
+.booked-overview-card-grid .overview-logistics:not(.overview-highlights-card):not(.overview-alerts-card),
+.booked-overview-card-grid .overview-checklist {
+  grid-column: 1 / -1;
+}
+
+.booked-overview-card-grid .overview-map-card {
+  position: relative;
+  min-height: 520px;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(43, 54, 49, 0.08);
+}
+
+.booked-overview-card-grid .overview-map-canvas {
+  min-height: 520px;
+}
+
+.booked-overview-card-grid .overview-slideshow-card {
+  min-height: 520px;
+  max-height: none;
+  box-shadow: 0 14px 34px rgba(43, 54, 49, 0.08);
+}
+
+.overview-highlight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.overview-alerts-card .suggestion-list,
+.overview-alerts-card .suggestions-grid {
+  margin: 0;
+}
+
+.booked-overview-card-grid .overview-logistics {
+  padding: 16px;
+}
+
+.booked-overview-card-grid .overview-checklist {
+  margin-top: 0;
+}
+
+@media (min-width: 920px) {
+  .booked-overview-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, auto);
+    align-items: end;
+  }
+
+  .booked-overview-hero .button-row {
+    justify-content: end;
+  }
+
+  .overview-route-strip {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1180px) {
+  .booked-dashboard-grid .peru-dashboard-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .booked-overview-card-grid .overview-map-card,
+  .booked-overview-card-grid .overview-slideshow-card,
+  .booked-overview-card-grid .overview-region-calendar,
+  .booked-overview-card-grid .overview-highlights-card,
+  .booked-overview-card-grid .overview-alerts-card {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .booked-dashboard-grid .peru-dashboard-grid,
+  .overview-highlight-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .booked-overview-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .booked-overview-card-grid .overview-map-card,
+  .booked-overview-card-grid .overview-map-canvas,
+  .booked-overview-card-grid .overview-slideshow-card {
+    min-height: 420px;
+  }
 }
 
 .trip-peru .itinerary-card.no-real-image,

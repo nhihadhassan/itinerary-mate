@@ -1095,8 +1095,8 @@ function App() {
         />
       )}
 
-      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${(isJapanExploreView || isTripCalendarView || isDiscoveryView) ? "explore-main-grid" : ""}`}>
-        {!isJapanExploreView && !isTripCalendarView && !isDiscoveryView && <aside className="side-panel">
+      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${bookedTripIds.has(activeTrip.id) && activeView === "dashboard" ? "booked-dashboard-grid" : ""} ${(isJapanExploreView || isTripCalendarView || isDiscoveryView) ? "explore-main-grid" : ""}`}>
+        {!isJapanExploreView && !isTripCalendarView && !isDiscoveryView && !(bookedTripIds.has(activeTrip.id) && activeView === "dashboard") && <aside className="side-panel">
           {activeTrip.id === "japan-2026" && (
             <section className="card route-card">
               <div className="section-heading">
@@ -1539,14 +1539,23 @@ function Dashboard({
   const reservationCount = trip.flights.length + trip.hotels.length + activities.filter((activity) => activity.type === "transport" || activity.type === "flight" || activity.category === "Transit" || activity.category === "Flight").length;
   const savedLinks = trip.attachments.length + activities.filter((activity) => activity.googleMapsQuery || activity.sourceUrl || activity.address).length;
   if (bookedTripIds.has(trip.id)) {
+    const anchorTitles = trip.id === "portugal-2026"
+      ? ["Lisbon soft start", "Algarve reset", "Sintra together", "Porto and Douro"]
+      : ["Altitude first", "Sacred Valley", "Machu Picchu", "Arequipa and Colca"];
     return (
       <section className="content-section peru-overview">
         <div className="booked-overview-layout">
           <div className="booked-overview-main">
-            <div className="section-heading">
+            <div className="booked-overview-hero">
               <div>
                 <p className="eyebrow">{formatDate(trip.startDate)} to {formatDate(trip.endDate)}</p>
                 <h2>{trip.title}</h2>
+                <p>{trip.description}</p>
+              </div>
+              <div className="overview-route-strip" aria-label={`${trip.country} trip regions`}>
+                {Array.from(new Set(activities.filter((activity) => activity.country === trip.country).map((activity) => activity.region || activity.city))).filter(Boolean).slice(0, 7).map((place) => (
+                  <span key={place}>{place}</span>
+                ))}
               </div>
               <div className="button-row">
                 <button className="ghost-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(2)")?.click()}>
@@ -1565,13 +1574,43 @@ function Dashboard({
               <MetricCard label="Booked" value={String(booked)} detail={`${incomplete} incomplete`} icon={<BadgeCheck size={18} />} />
               <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
             </div>
-            <div className="peru-overview-feature-grid">
+            <div className="booked-overview-card-grid">
+              <TripDestinationMap trip={trip} activities={activities} />
               <TripImageSlideshow trip={trip} activities={activities} />
+              <TripRegionCalendar trip={trip} compact />
+              <section className="overview-logistics overview-highlights-card">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">Trip shape</p>
+                    <h2>What this plan is protecting</h2>
+                  </div>
+                  <Sparkles size={20} aria-hidden="true" />
+                </div>
+                <div className="overview-highlight-grid">
+                  {anchorTitles.map((title) => (
+                    <article className="overview-mini-card" key={title}>
+                      <strong>{title}</strong>
+                      <span>{trip.id === "portugal-2026" ? portugalAnchorCopy(title) : peruAnchorCopy(title)}</span>
+                    </article>
+                  ))}
+                </div>
+              </section>
+              {routeSuggestions.length > 0 && (
+                <section className="overview-logistics overview-alerts-card">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">Needs attention</p>
+                      <h2>Route checks</h2>
+                    </div>
+                    <TriangleAlert size={20} aria-hidden="true" />
+                  </div>
+                  <SuggestionList suggestions={routeSuggestions.slice(0, 3)} />
+                </section>
+              )}
+              <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
+              <OverviewChecklist trip={trip} checklistItems={checklistItems} addChecklistItem={addChecklistItem} toggleChecklistItem={toggleChecklistItem} deleteChecklistItem={deleteChecklistItem} />
             </div>
-            <OverviewLogistics trip={trip} routeSuggestions={routeSuggestions} exchangeRate={exchangeRate} />
-            <OverviewChecklist trip={trip} checklistItems={checklistItems} addChecklistItem={addChecklistItem} toggleChecklistItem={toggleChecklistItem} deleteChecklistItem={deleteChecklistItem} />
           </div>
-          <TripDestinationMap trip={trip} activities={activities} />
         </div>
       </section>
     );
