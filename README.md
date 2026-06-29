@@ -1,6 +1,8 @@
 # Itinerary Mate
 
-Itinerary Mate is a local-first multi-trip itinerary tracker built with Vite, React, and TypeScript. It currently includes:
+**Live demo:** https://itinerary-mate.vercel.app
+
+Itinerary Mate is a local-first multi-trip itinerary tracker built with Vite, React, and TypeScript — a travel command center with editable day-by-day cards, multi-currency budget dashboards, flight/lodging tracking, OpenStreetMap previews, CSV export, dark mode, and offline PWA support. It currently includes:
 
 - Japan Trip: the original September 1-30, 2026 planner with JPY source budgets and CAD comparison.
 - Peru Trip: a July 11-26, 2026 Wanderlog import enriched from the local Wanderlog PDF, with 55 dated cards, exact route-leg timing text, 16 daily route summaries, 4 flights, 10 lodging blocks, 2 train/transit blocks, 19 imported CAD expenses, and PEN + CAD planning displays.
@@ -54,7 +56,7 @@ pnpm preview
 
 ## Peru Import Workflow
 
-The Google Doc source previously redirected document export to Google sign-in. The local file `/Users/nhihad/Downloads/Trip to Peru – Wanderlog.pdf` now provides the same detailed Wanderlog/Google Doc trip information and is used for route-leg timings, daily route summaries, opening-hour notes, flights, hotels, transit, and expenses.
+The Google Doc source previously redirected document export to Google sign-in. A locally exported Wanderlog/Google Doc PDF provides the same detailed trip information and is used for route-leg timings, daily route summaries, opening-hour notes, flights, hotels, transit, and expenses.
 
 You can use the in-app **Import** tab to:
 
@@ -127,3 +129,7 @@ The repo includes `vercel.json` with the Vite build settings.
 - Check desktop, tablet, and 375px mobile widths for horizontal overflow.
 - Confirm production build has `manifest.webmanifest` and service worker registration.
 - Open the deployed Vercel URL on a phone.
+
+## License
+
+Released under the [MIT License](LICENSE).
