@@ -2369,7 +2369,10 @@ img {
   font-size: 0.82rem;
 }
 
-.day-map-stack {
+/* The multi-day stack is a tall list, so it should scroll with the timeline
+   rather than stay pinned like the single-day map panel does. */
+.map-panel.day-map-stack {
+  position: static;
   align-self: start;
 }
 
@@ -2389,8 +2392,8 @@ img {
 }
 
 .day-map-canvas {
-  min-height: 220px;
-  aspect-ratio: 1 / 1;
+  min-height: 200px;
+  aspect-ratio: 4 / 3;
 }
 
 .lazy-map-placeholder {
@@ -2692,6 +2695,11 @@ img {
 
   .map-canvas {
     min-height: min(68vh, 760px);
+  }
+
+  /* Two day maps per row so a long trip's stack stays scannable. */
+  .day-map-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .itinerary-card {
