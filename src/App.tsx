@@ -28,6 +28,7 @@ import {
   Hotel,
   Import,
   Bookmark,
+  BookOpen,
   Map as MapIcon,
   MapPin,
   Moon,
@@ -56,16 +57,18 @@ import {
 } from "./japanItinerary";
 import { peruDayRouteSummaries, peruRouteSuggestions, peruTrip } from "./peruItinerary";
 import { portugalDayRouteSummaries, portugalRegionCalendar, portugalRouteSuggestions, portugalTrip } from "./portugalItinerary";
+import { portugalActualMarkdown } from "./portugalActualTrip";
 import { japanExploreKinds, japanExplorePlaces } from "./japanExplore";
 import type { JapanExploreKind, JapanExplorePlace } from "./japanExplore";
 import { discoveryKinds, discoveryPlaces, discoveryWindows } from "./discoveryPlaces";
 import type { DiscoveryKind, DiscoveryPlace, DiscoveryWindow } from "./discoveryPlaces";
 import { searchOpenPlaces } from "./lib/openMapServices";
 import type { OpenPlaceSearchResult } from "./lib/openMapServices";
-import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId } from "./tripTypes";
+import type { ActualExpense, ActualVisit, RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId, TripJournalDay } from "./tripTypes";
 
-type AppView = "dashboard" | "itinerary" | "calendar" | "places" | "discovery" | "budget" | "maps" | "more";
+type AppView = "dashboard" | "itinerary" | "calendar" | "places" | "discovery" | "journal" | "budget" | "maps" | "more";
 type ThemePreference = "light" | "dark";
+type PortugalMode = "plan" | "actual";
 
 interface LegacyJapanState {
   version: 1;
@@ -95,6 +98,7 @@ interface BudgetRange {
 const MULTI_STORAGE_KEY = "itinerary-mate-v2";
 const LEGACY_JAPAN_STORAGE_KEY = "september-japan-planner-v1";
 const CHECKLIST_STORAGE_KEY = "itinerary-mate-checklists-v1";
+const PORTUGAL_MODE_STORAGE_KEY = "itinerary-mate-portugal-mode-v1";
 const tripOrder: TripId[] = ["japan-2026", "peru-2026", "portugal-2026"];
 const calendarTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
 const bookedTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
@@ -338,6 +342,21 @@ function mergeTrip(defaultTrip: Trip, storedTrip?: Trip): Trip {
     ),
   );
   const manualActivities = storedTrip.activities.filter((activity) => !defaultIds.has(activity.id) && (activity.source === "manual" || activity.id.includes("custom") || activity.id.includes("rest")));
+  const actuals = defaultTrip.actuals
+    ? {
+        ...defaultTrip.actuals,
+        visits: defaultTrip.actuals.visits.map((visit) => {
+          const storedVisit = storedTrip.actuals?.visits.find((item) => item.id === visit.id);
+          return storedVisit ? { ...visit, status: storedVisit.status, evidence: storedVisit.evidence, notes: storedVisit.notes } : visit;
+        }),
+        expenses: defaultTrip.actuals.expenses.map((expense) => {
+          const storedExpense = storedTrip.actuals?.expenses.find((item) => item.id === expense.id);
+          return storedExpense
+            ? { ...expense, payer: storedExpense.payer, personalShareCad: storedExpense.personalShareCad, isShared: storedExpense.isShared }
+            : expense;
+        }),
+      }
+    : undefined;
   return {
     ...defaultTrip,
     notes: storedTrip.notes || defaultTrip.notes,
@@ -346,6 +365,7 @@ function mergeTrip(defaultTrip: Trip, storedTrip?: Trip): Trip {
     flights: storedTrip.flights?.length ? storedTrip.flights : defaultTrip.flights,
     hotels: storedTrip.hotels?.length ? storedTrip.hotels : defaultTrip.hotels,
     attachments: storedTrip.attachments?.length ? storedTrip.attachments : defaultTrip.attachments,
+    actuals,
   };
 }
 
@@ -588,6 +608,7 @@ function App() {
   const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(() => new Set());
   const [loadedImageIds, setLoadedImageIds] = useState<Set<string>>(() => new Set());
   const [updateReady, setUpdateReady] = useState(false);
+  const [portugalMode, setPortugalMode] = useState<PortugalMode>(() => parseStored<PortugalMode>(PORTUGAL_MODE_STORAGE_KEY) || "actual");
   const [checklists, setChecklists] = useState<Record<TripId, ChecklistItem[]>>(() => parseStored<Record<TripId, ChecklistItem[]>>(CHECKLIST_STORAGE_KEY) || makeDefaultChecklistState());
 
   const sensors = useSensors(
@@ -596,12 +617,17 @@ function App() {
   );
 
   const activeTrip = state.trips[state.activeTripId];
+  const isPortugalActual = activeTrip.id === "portugal-2026" && portugalMode === "actual" && Boolean(activeTrip.actuals);
   const activeNavItems = useMemo(
-    () =>
-      calendarTripIds.has(activeTrip.id)
+    () => {
+      if (isPortugalActual) {
+        return baseNavItems.flatMap((item) => (item.id === "budget" ? [{ id: "journal" as AppView, label: "Journal" }, item] : [item]));
+      }
+      return calendarTripIds.has(activeTrip.id)
         ? baseNavItems.flatMap((item) => (item.id === "itinerary" ? [item, { id: "calendar" as AppView, label: "Calendar" }] : [item]))
-        : baseNavItems,
-    [activeTrip.id],
+        : baseNavItems;
+    },
+    [activeTrip.id, isPortugalActual],
   );
   const allVisibleActivities = useMemo(() => visibleActivities(activeTrip, state.japanBranch), [activeTrip, state.japanBranch]);
   const totalDays = useMemo(() => Math.max(...activeTrip.activities.map((activity) => activity.day), 1), [activeTrip.activities]);
@@ -686,6 +712,10 @@ function App() {
     localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify(checklists));
   }, [checklists]);
 
+  useEffect(() => {
+    localStorage.setItem(PORTUGAL_MODE_STORAGE_KEY, JSON.stringify(portugalMode));
+  }, [portugalMode]);
+
   function updateState(patch: Partial<MultiTripState>) {
     setState((current) => ({ ...current, ...patch }));
   }
@@ -701,6 +731,16 @@ function App() {
         },
       },
     }));
+  }
+
+  function updateActualVisit(id: string, patch: Partial<ActualVisit>) {
+    if (!activeTrip.actuals) return;
+    updateActiveTrip({
+      actuals: {
+        ...activeTrip.actuals,
+        visits: activeTrip.actuals.visits.map((visit) => (visit.id === id ? { ...visit, ...patch } : visit)),
+      },
+    });
   }
 
   function openView(view: AppView) {
@@ -1082,7 +1122,20 @@ function App() {
         ))}
       </nav>
 
-      {activeView !== "dashboard" && !isJapanExploreView && !isTripCalendarView && !isDiscoveryView && (
+      {activeTrip.id === "portugal-2026" && (
+        <div className="trip-mode-bar" aria-label="Portugal trip mode">
+          <div>
+            <span>Portugal record</span>
+            <strong>{portugalMode === "actual" ? "Actual trip" : "Original plan"}</strong>
+          </div>
+          <div className="segmented-control" role="group" aria-label="Choose planned or actual trip">
+            <button type="button" className={portugalMode === "plan" ? "active" : ""} onClick={() => { setPortugalMode("plan"); if (activeView === "journal") setActiveView("dashboard"); }}>Plan</button>
+            <button type="button" className={portugalMode === "actual" ? "active" : ""} onClick={() => { setPortugalMode("actual"); if (activeView === "calendar") setActiveView("dashboard"); }}>Actual</button>
+          </div>
+        </div>
+      )}
+
+      {activeView !== "dashboard" && !isPortugalActual && !isJapanExploreView && !isTripCalendarView && !isDiscoveryView && (
         <DayRail
           days={days}
           activities={allVisibleActivities}
@@ -1095,8 +1148,8 @@ function App() {
         />
       )}
 
-      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${bookedTripIds.has(activeTrip.id) && activeView === "dashboard" ? "booked-dashboard-grid" : ""} ${(isJapanExploreView || isTripCalendarView || isDiscoveryView) ? "explore-main-grid" : ""}`}>
-        {!isJapanExploreView && !isTripCalendarView && !isDiscoveryView && !(bookedTripIds.has(activeTrip.id) && activeView === "dashboard") && <aside className="side-panel">
+      <main id="main-content" className={`main-grid ${activeView === "itinerary" ? "itinerary-main-grid" : ""} ${bookedTripIds.has(activeTrip.id) && activeView === "dashboard" ? "booked-dashboard-grid" : ""} ${isPortugalActual ? "actual-trip-main-grid" : ""} ${(isJapanExploreView || isTripCalendarView || isDiscoveryView) ? "explore-main-grid" : ""}`}>
+        {!isPortugalActual && !isJapanExploreView && !isTripCalendarView && !isDiscoveryView && !(bookedTripIds.has(activeTrip.id) && activeView === "dashboard") && <aside className="side-panel">
           {activeTrip.id === "japan-2026" && (
             <section className="card route-card">
               <div className="section-heading">
@@ -1138,7 +1191,7 @@ function App() {
         </aside>}
 
         <div className="content-stack">
-          {!(bookedTripIds.has(activeTrip.id) && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && !isTripCalendarView && !isDiscoveryView && (
+          {!isPortugalActual && !(bookedTripIds.has(activeTrip.id) && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && !isTripCalendarView && !isDiscoveryView && (
             <FilterBar
               query={query}
               setQuery={setQuery}
@@ -1156,7 +1209,11 @@ function App() {
             />
           )}
 
-          {activeView === "dashboard" && (
+          {activeView === "dashboard" && isPortugalActual && activeTrip.actuals && (
+            <ActualTripOverview trip={activeTrip} updateVisit={updateActualVisit} />
+          )}
+
+          {activeView === "dashboard" && !isPortugalActual && (
             <Dashboard
               trip={activeTrip}
               activities={allVisibleActivities}
@@ -1170,7 +1227,11 @@ function App() {
             />
           )}
 
-          {activeView === "itinerary" && (
+          {activeView === "itinerary" && isPortugalActual && activeTrip.actuals && (
+            <ActualTripItinerary trip={activeTrip} updateVisit={updateActualVisit} />
+          )}
+
+          {activeView === "itinerary" && !isPortugalActual && (
             <div className="planner-split">
               <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
                 <ItineraryTimeline
@@ -1216,7 +1277,11 @@ function App() {
             />
           )}
 
-          {activeView === "places" && (
+          {activeView === "places" && isPortugalActual && activeTrip.actuals && (
+            <ActualPlaces trip={activeTrip} updateVisit={updateActualVisit} />
+          )}
+
+          {activeView === "places" && !isPortugalActual && (
             activeTrip.id === "japan-2026" ? (
               <JapanExploreBoard
                 places={japanExplorePlaces}
@@ -1257,11 +1322,23 @@ function App() {
             />
           )}
 
-          {activeView === "budget" && (
+          {activeView === "journal" && isPortugalActual && activeTrip.actuals && (
+            <PortugalJournal trip={activeTrip} setSaveStatus={setSaveStatus} />
+          )}
+
+          {activeView === "budget" && isPortugalActual && activeTrip.actuals && (
+            <ActualBudgetDashboard trip={activeTrip} />
+          )}
+
+          {activeView === "budget" && !isPortugalActual && (
             <BudgetDashboard trip={activeTrip} activities={allVisibleActivities} budget={budget} updateActivity={updateActivity} exchangeRate={activeExchangeRate} />
           )}
 
-          {activeView === "maps" && (
+          {activeView === "maps" && isPortugalActual && activeTrip.actuals && (
+            <ActualTripMaps trip={activeTrip} />
+          )}
+
+          {activeView === "maps" && !isPortugalActual && (
             <MapsExport
               trip={activeTrip}
               activities={selectedDayActivities.length ? selectedDayActivities : filteredActivities}
@@ -1288,6 +1365,347 @@ function App() {
       </main>
     </div>
   );
+}
+
+function normalizePlaceName(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function titleCase(value: string) {
+  return value.replace(/(^|\s)\S/g, (character) => character.toUpperCase());
+}
+
+const actualVisitAliases: Record<string, string> = {
+  "national palace of pena": "pena palace",
+  "porto sao bento": "sao bento station",
+  "luis i bridge": "dom luis i bridge",
+};
+
+function plannedActivityForVisit(trip: Trip, visit: ActualVisit) {
+  const target = normalizePlaceName(actualVisitAliases[normalizePlaceName(visit.title)] || visit.title);
+  return trip.activities.find((activity) => {
+    const candidate = normalizePlaceName(activity.title);
+    return candidate === target || (target.length > 6 && (candidate.includes(target) || target.includes(candidate)));
+  });
+}
+
+function actualVisitActivities(trip: Trip, includeUnconfirmed = false) {
+  if (!trip.actuals) return [];
+  return trip.actuals.visits
+    .filter((visit) => visit.status === "visited" || (includeUnconfirmed && visit.status === "unconfirmed"))
+    .map((visit) => {
+      const planned = plannedActivityForVisit(trip, visit);
+      return {
+        ...(planned || {
+          tripId: trip.id,
+          country: visit.city === "Toronto" ? "Canada" : "Portugal",
+          description: visit.notes,
+          category: "Must See" as TripCategory,
+          duration: "Actual visit",
+          estimatedCost: 0,
+          currency: trip.currency,
+          attachmentIds: [],
+          imageUrl: placeholderFor(visit.title),
+          priority: 3,
+          isBooked: true,
+          source: "Wanderlog PDF" as const,
+        }),
+        id: "actual-" + visit.id,
+        day: visit.day,
+        date: visit.date,
+        city: visit.city,
+        region: visit.region,
+        title: visit.title,
+        googleMapsQuery: visit.googleMapsQuery,
+        notes: visit.notes,
+        isCompleted: visit.status === "visited",
+      } as TripActivity;
+    });
+}
+
+function actualExpenseLabel(expense: ActualExpense) {
+  return (expense.currency === "EUR" ? "€" : "CA$") + expense.amount.toFixed(2);
+}
+
+function cadLabel(value: number) {
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(value);
+}
+
+function expensesForVisit(expenses: ActualExpense[], visit: ActualVisit) {
+  return expenses.filter((expense) => visit.expenseIds.includes(expense.id));
+}
+
+function visitImage(trip: Trip, visit?: ActualVisit, imageActivityTitle?: string) {
+  const planned = imageActivityTitle
+    ? trip.activities.find((activity) => normalizePlaceName(activity.title) === normalizePlaceName(imageActivityTitle))
+    : visit
+      ? plannedActivityForVisit(trip, visit)
+      : undefined;
+  const cityFallback = trip.activities.find((activity) => activity.city === visit?.city && isImageUrl(activity.imageUrl));
+  return planned && isImageUrl(planned.imageUrl) ? planned : cityFallback;
+}
+
+function ActualTripOverview({ trip, updateVisit }: { trip: Trip; updateVisit: (id: string, patch: Partial<ActualVisit>) => void }) {
+  const actuals = trip.actuals!;
+  const visited = actuals.visits.filter((visit) => visit.status === "visited");
+  const unconfirmed = actuals.visits.filter((visit) => visit.status === "unconfirmed");
+  const cities = Array.from(new Set(visited.map((visit) => visit.city).filter((city) => city !== "Toronto")));
+  const categoryTotals = actuals.expenses.reduce<Record<string, number>>((acc, expense) => {
+    acc[expense.category] = (acc[expense.category] || 0) + expense.cadEquivalent;
+    return acc;
+  }, {});
+  const largestCategory = Math.max(...Object.values(categoryTotals));
+  return (
+    <section className="actual-dashboard">
+      <header className="actual-hero">
+        <div>
+          <p className="eyebrow">Completed journey · {formatDate(trip.startDate)} to {formatDate(trip.endDate)}</p>
+          <h2>Portugal, as it happened</h2>
+          <p>Seventeen days from Lisbon to the Algarve, back through Sintra, then north to Porto and the Douro Valley.</p>
+        </div>
+        <div className="actual-total-lockup">
+          <span>Whole-trip spend</span>
+          <strong>{cadLabel(actuals.sourceTotalCad)}</strong>
+          <small>Wanderlog reconciled total</small>
+        </div>
+      </header>
+
+      <div className="actual-summary-band" aria-label="Actual trip summary">
+        <div><span>Expenses</span><strong>{actuals.expenses.length}</strong><small>itemized purchases</small></div>
+        <div><span>Confirmed</span><strong>{visited.length}</strong><small>visited places</small></div>
+        <div><span>Review</span><strong>{unconfirmed.length}</strong><small>unconfirmed stops</small></div>
+        <div><span>Route</span><strong>{cities.length}</strong><small>cities and regions</small></div>
+      </div>
+
+      <div className="actual-overview-grid">
+        <TripDestinationMap trip={trip} activities={actualVisitActivities(trip)} />
+        <section className="actual-route-panel">
+          <div className="section-heading compact-heading">
+            <div><p className="eyebrow">Route record</p><h3>Five chapters</h3></div>
+            <BookOpen size={20} aria-hidden="true" />
+          </div>
+          {Array.from(new Set(actuals.journalDays.map((day) => day.chapter))).filter((chapter) => chapter !== "Departure").map((chapter) => {
+            const chapterDays = actuals.journalDays.filter((day) => day.chapter === chapter);
+            const chapterSpend = actuals.expenses.filter((expense) => chapterDays.some((day) => day.date === expense.date)).reduce((sum, expense) => sum + expense.cadEquivalent, 0);
+            return <article key={chapter}><div><strong>{chapter}</strong><span>{chapterDays.length} {chapterDays.length === 1 ? "day" : "days"}</span></div><b>{cadLabel(chapterSpend)}</b></article>;
+          })}
+          <div className="actual-currency-note">
+            <span>Original ledger</span>
+            <strong>CA\${actuals.originalTotals.CAD.toFixed(2)} + €{actuals.originalTotals.EUR.toFixed(2)}</strong>
+            <small>Historical blend: €1 = CA\${actuals.eurToCad.toFixed(6)}</small>
+          </div>
+        </section>
+      </div>
+
+      <div className="actual-review-row">
+        <section className="actual-category-summary">
+          <div className="section-heading compact-heading"><div><p className="eyebrow">Where it went</p><h3>Largest categories</h3></div></div>
+          {Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([category, total]) => (
+            <div className="actual-progress-row" key={category}><span>{titleCase(category)}</span><div><i style={{ width: Math.max(5, total / largestCategory * 100) + "%" }} /></div><strong>{cadLabel(total)}</strong></div>
+          ))}
+        </section>
+        <section className="actual-confirmation-panel">
+          <div className="section-heading compact-heading"><div><p className="eyebrow">Evidence review</p><h3>{unconfirmed.length} stops to confirm</h3></div></div>
+          {unconfirmed.map((visit) => (
+            <label key={visit.id}>
+              <span><strong>{visit.title}</strong><small>{formatDate(visit.date)} · {visit.city}</small></span>
+              <select value={visit.status} onChange={(event) => updateVisit(visit.id, { status: event.target.value as ActualVisit["status"], evidence: "manual" })} aria-label={"Status for " + visit.title}>
+                <option value="unconfirmed">Unconfirmed</option><option value="visited">Visited</option><option value="skipped">Skipped</option>
+              </select>
+            </label>
+          ))}
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function ActualTripItinerary({ trip, updateVisit }: { trip: Trip; updateVisit: (id: string, patch: Partial<ActualVisit>) => void }) {
+  const actuals = trip.actuals!;
+  return (
+    <section className="actual-itinerary-layout">
+      <div className="actual-day-ledger">
+        <header className="actual-section-header"><div><p className="eyebrow">Evidence-based timeline</p><h2>The trip, day by day</h2></div><span>{actuals.visits.filter((visit) => visit.status === "visited").length} confirmed places</span></header>
+        {actuals.journalDays.map((day) => {
+          const visits = actuals.visits.filter((visit) => day.visitIds.includes(visit.id));
+          const expenses = actuals.expenses.filter((expense) => expense.date === day.date);
+          const dayTotal = expenses.reduce((sum, expense) => sum + expense.cadEquivalent, 0);
+          return (
+            <article className="actual-day-card" key={day.id} id={"actual-day-" + day.day}>
+              <header><div><p className="eyebrow">Day {day.day} · {formatDate(day.date)}</p><h3>{day.title}</h3><p>{day.summary}</p></div><strong>{cadLabel(dayTotal)}<small>{expenses.length} expenses</small></strong></header>
+              <div className="actual-visit-list">
+                {visits.map((visit) => {
+                  const linked = expensesForVisit(actuals.expenses, visit);
+                  const evidenceLabel = visit.evidence === "expense" ? "Expense confirmed" : visit.evidence === "manual" ? "Manually reviewed" : "Dated route";
+                  return (
+                    <div className={"actual-visit-row status-" + visit.status} key={visit.id}>
+                      <span className="visit-status-dot" aria-hidden="true" />
+                      <div><strong>{visit.title}</strong><small>{visit.region} · {evidenceLabel}{linked.length ? " · " + linked.map(actualExpenseLabel).join(", ") : ""}</small></div>
+                      <select value={visit.status} onChange={(event) => updateVisit(visit.id, { status: event.target.value as ActualVisit["status"], evidence: "manual" })} aria-label={"Status for " + visit.title}>
+                        <option value="visited">Visited</option><option value="unconfirmed">Unconfirmed</option><option value="skipped">Skipped</option>
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <TripDayMapStack trip={trip} activities={actualVisitActivities(trip, true)} />
+    </section>
+  );
+}
+
+function ActualPlaces({ trip, updateVisit }: { trip: Trip; updateVisit: (id: string, patch: Partial<ActualVisit>) => void }) {
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"all" | ActualVisit["status"]>("all");
+  const visits = trip.actuals!.visits.filter((visit) => {
+    const queryMatch = !query.trim() || (visit.title + " " + visit.city + " " + visit.region).toLowerCase().includes(query.trim().toLowerCase());
+    return queryMatch && (status === "all" || visit.status === status);
+  });
+  return (
+    <section className="actual-places-view">
+      <header className="actual-section-header"><div><p className="eyebrow">Actual places</p><h2>Every stop with evidence</h2></div><span>{visits.length} places</span></header>
+      <div className="actual-toolbar">
+        <label className="search-field"><Search size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search places or regions" /></label>
+        <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">All statuses</option><option value="visited">Visited</option><option value="unconfirmed">Unconfirmed</option><option value="skipped">Skipped</option></select>
+      </div>
+      <div className="actual-place-grid">
+        {visits.map((visit) => {
+          const image = visitImage(trip, visit);
+          const evidenceLabel = visit.evidence === "expense" ? "Expense confirmed" : visit.evidence === "manual" ? "Manually reviewed" : "Dated itinerary";
+          return (
+            <article key={visit.id} className={"actual-place-row status-" + visit.status}>
+              {image && <img src={image.imageUrl} alt={image.imageAlt || visit.title} loading="lazy" />}
+              <div><p className="eyebrow">{formatDate(visit.date)} · {visit.region}</p><h3>{visit.title}</h3><span>{evidenceLabel}</span></div>
+              <div className="actual-place-actions">
+                <a className="icon-button" href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(visit.googleMapsQuery)} target="_blank" rel="noreferrer" title={"Open " + visit.title + " in maps"}><MapPin size={17} /></a>
+                <select value={visit.status} onChange={(event) => updateVisit(visit.id, { status: event.target.value as ActualVisit["status"], evidence: "manual" })} aria-label={"Status for " + visit.title}><option value="visited">Visited</option><option value="unconfirmed">Unconfirmed</option><option value="skipped">Skipped</option></select>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ActualBudgetDashboard({ trip }: { trip: Trip }) {
+  const actuals = trip.actuals!;
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [city, setCity] = useState("all");
+  const cities = Array.from(new Set(actuals.expenses.map((expense) => expense.city))).sort();
+  const expenses = actuals.expenses.filter((expense) => {
+    const queryMatch = !query.trim() || (expense.merchant + " " + expense.city).toLowerCase().includes(query.trim().toLowerCase());
+    return queryMatch && (category === "all" || expense.category === category) && (city === "all" || expense.city === city);
+  });
+  const categoryTotals = actuals.expenses.reduce<Record<string, number>>((acc, expense) => {
+    acc[expense.category] = (acc[expense.category] || 0) + expense.cadEquivalent;
+    return acc;
+  }, {});
+  const filteredTotal = expenses.reduce((sum, expense) => sum + expense.cadEquivalent, 0);
+  return (
+    <section className="actual-budget-view">
+      <header className="actual-hero actual-budget-hero">
+        <div><p className="eyebrow">Actual spending</p><h2>{cadLabel(actuals.sourceTotalCad)}</h2><p>103 expenses across the full Portugal trip, preserved in their original currencies.</p></div>
+        <div className="actual-original-totals"><span>Original ledger</span><strong>CA\${actuals.originalTotals.CAD.toFixed(2)}</strong><strong>€{actuals.originalTotals.EUR.toFixed(2)}</strong></div>
+      </header>
+      <div className="actual-budget-layout">
+        <section className="actual-budget-categories">
+          <h3>By category</h3>
+          {Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).map(([name, total]) => <button type="button" key={name} className={category === name ? "active" : ""} onClick={() => setCategory(category === name ? "all" : name)}><span>{titleCase(name)}</span><strong>{cadLabel(total)}</strong></button>)}
+        </section>
+        <section className="actual-ledger-panel">
+          <div className="actual-toolbar">
+            <label className="search-field"><Search size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search merchants" /></label>
+            <select value={city} onChange={(event) => setCity(event.target.value)}><option value="all">All cities</option>{cities.map((item) => <option value={item} key={item}>{item}</option>)}</select>
+          </div>
+          <div className="actual-ledger-heading"><span>{expenses.length} expenses</span><strong>{cadLabel(filteredTotal)}</strong></div>
+          <div className="actual-ledger" role="table" aria-label="Portugal actual expenses">
+            {expenses.map((expense) => <div role="row" key={expense.id}><span role="cell"><strong>{expense.merchant}</strong><small>{formatDate(expense.date)} · {expense.city} · {titleCase(expense.category)}</small></span><span role="cell"><strong>{actualExpenseLabel(expense)}</strong>{expense.currency === "EUR" && <small>{cadLabel(expense.cadEquivalent)}</small>}</span></div>)}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function ActualTripMaps({ trip }: { trip: Trip }) {
+  const [showUnconfirmed, setShowUnconfirmed] = useState(false);
+  const visits = trip.actuals!.visits.filter((visit) => visit.status === "visited" || (showUnconfirmed && visit.status === "unconfirmed"));
+  return (
+    <section className="actual-maps-view">
+      <header className="actual-section-header"><div><p className="eyebrow">Actual route map</p><h2>Portugal places visited</h2></div><label className="toggle"><input type="checkbox" checked={showUnconfirmed} onChange={(event) => setShowUnconfirmed(event.target.checked)} /> Show unconfirmed</label></header>
+      <TripDestinationMap trip={trip} activities={actualVisitActivities(trip, showUnconfirmed)} />
+      <div className="actual-map-list">{visits.map((visit) => <a key={visit.id} href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(visit.googleMapsQuery)} target="_blank" rel="noreferrer"><span><strong>{visit.title}</strong><small>{visit.city} · {formatDate(visit.date)}</small></span><MapPin size={17} /></a>)}</div>
+    </section>
+  );
+}
+
+function downloadTextFile(fileName: string, value: string) {
+  const blob = new Blob([value], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function journalImageForChapter(trip: Trip, chapter: string) {
+  const titleByChapter: Record<string, string> = {
+    Lisbon: "Belém Tower",
+    Lagos: "Ponta da Piedade",
+    Sintra: "Pena Palace",
+    Porto: "Ribeira",
+    "Douro Valley": "Douro Valley",
+  };
+  const target = titleByChapter[chapter] || "Ribeira";
+  return tripHeroSlides[trip.id]?.find((slide) => slide.title === target);
+}
+
+function PortugalJournal({ trip, setSaveStatus }: { trip: Trip; setSaveStatus: (message: string) => void }) {
+  const actuals = trip.actuals!;
+  const heroImage = journalImageForChapter(trip, "Porto");
+  const chapters = Array.from(new Set(actuals.journalDays.map((day) => day.chapter)));
+  const markdown = portugalActualMarkdown(actuals);
+  return (
+    <article className="portugal-journal">
+      <header className="journal-hero" style={heroImage ? { backgroundImage: `url("${heroImage.imageUrl}")` } : undefined}>
+        <div>
+          <p className="eyebrow">Portugal · June 2026</p>
+          <h2>Seventeen days across mainland Portugal</h2>
+          <p>Lisbon's hills, the Algarve coast, Sintra's palaces, Porto's stone streets, and one long day through the Douro Valley.</p>
+          <div className="journal-actions">
+            <button className="primary-button" type="button" onClick={() => downloadTextFile("portugal-2026-actual-trip.md", markdown)}><Download size={17} /> Export Markdown</button>
+            <button className="ghost-button" type="button" onClick={async () => { await copyText(markdown); setSaveStatus("Copied Portugal journal Markdown"); }}><Clipboard size={17} /> Copy story</button>
+          </div>
+        </div>
+      </header>
+      <div className="journal-facts"><span><strong>17</strong> days</span><span><strong>{actuals.visits.filter((visit) => visit.status === "visited").length}</strong> confirmed places</span><span><strong>{actuals.expenses.length}</strong> expenses</span><span><strong>{cadLabel(actuals.sourceTotalCad)}</strong> total</span></div>
+      {chapters.map((chapter, chapterIndex) => {
+        const days = actuals.journalDays.filter((day) => day.chapter === chapter);
+        if (chapter === "Departure") return null;
+        const image = journalImageForChapter(trip, chapter);
+        return (
+          <section className={"journal-chapter " + (chapterIndex % 2 ? "image-right" : "")} key={chapter}>
+            {image && <figure><img src={image.imageUrl} alt={image.imageAlt || chapter} loading="lazy" /><figcaption>Wikimedia Commons destination image</figcaption></figure>}
+            <div><p className="eyebrow">Chapter {chapterIndex}</p><h3>{chapter}</h3>{days.map((day) => <JournalDay trip={trip} day={day} key={day.id} />)}</div>
+          </section>
+        );
+      })}
+      <section className="journal-spend-section"><div><p className="eyebrow">The practical record</p><h3>What the trip cost</h3><p>The full ledger remains attached to the story, with every entry preserved in its original currency and reconciled to the Wanderlog total.</p></div><strong>{cadLabel(actuals.sourceTotalCad)}<small>CA\${actuals.originalTotals.CAD.toFixed(2)} + €{actuals.originalTotals.EUR.toFixed(2)}</small></strong></section>
+      <details className="journal-ledger-details"><summary>View all {actuals.expenses.length} expenses</summary><div className="actual-ledger">{actuals.expenses.map((expense) => <div key={expense.id}><span><strong>{expense.merchant}</strong><small>{formatDate(expense.date)} · {expense.city}</small></span><span><strong>{actualExpenseLabel(expense)}</strong><small>{titleCase(expense.category)}</small></span></div>)}</div></details>
+    </article>
+  );
+}
+
+function JournalDay({ trip, day }: { trip: Trip; day: TripJournalDay }) {
+  const actuals = trip.actuals!;
+  const visits = actuals.visits.filter((visit) => day.visitIds.includes(visit.id) && visit.status === "visited");
+  return <div className="journal-day"><span>Day {day.day} · {formatDate(day.date)}</span><h4>{day.title}</h4><p>{day.summary}</p>{visits.length > 0 && <ul>{visits.slice(0, 5).map((visit) => <li key={visit.id}>{visit.title}</li>)}</ul>}</div>;
 }
 
 function makeBudget(trip: Trip, activities: TripActivity[]) {
@@ -2250,12 +2668,14 @@ function LeafletActivityMap({
     }).addTo(map);
     markerLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
-    window.setTimeout(() => {
+    const fitTimer = window.setTimeout(() => {
+      if (!mapRef.current) return;
       map.invalidateSize();
       fitLeafletStops(map, stopsRef.current, false);
     }, 80);
 
     return () => {
+      window.clearTimeout(fitTimer);
       map.remove();
       mapRef.current = null;
       markerLayerRef.current = null;
@@ -2286,9 +2706,13 @@ function LeafletActivityMap({
       markerLayer.addLayer(marker);
     });
     const map = mapRef.current;
-    if (map) {
-      window.setTimeout(() => fitLeafletStops(map, stopsRef.current, false), 40);
-    }
+    const fitTimer = map ? window.setTimeout(() => {
+      if (mapRef.current !== map) return;
+      fitLeafletStops(map, stopsRef.current, false);
+    }, 40) : undefined;
+    return () => {
+      if (fitTimer !== undefined) window.clearTimeout(fitTimer);
+    };
   }, [stops]);
 
   useEffect(() => {

@@ -1,8 +1,9 @@
 import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripFlight, TripHotel } from "./tripTypes";
+import { portugalActualTrip } from "./portugalActualTrip";
 
 export const PORTUGAL_CAD_TO_EUR = 0.65;
-export const PORTUGAL_WANDERLOG_PDF_SOURCE = "/Users/nhihad/Downloads/Trip to Portugal – Wanderlog.pdf";
-export const PORTUGAL_GOOGLE_DOC_PDF_SOURCE = "/Users/nhihad/Downloads/Portugal_Mainland_Trip_Itinerary_June_2026.docx.pdf";
+export const PORTUGAL_WANDERLOG_PDF_SOURCE = "Private local source: Trip to Portugal - Wanderlog.pdf";
+export const PORTUGAL_GOOGLE_DOC_PDF_SOURCE = "Private local source: Portugal itinerary PDF";
 
 const scenic = (name: string) =>
   `linear-gradient(135deg, hsl(${Math.abs([...name].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % 360} 44% 84%) 0%, #f6efe3 52%, #ddeee8 100%)`;
@@ -159,7 +160,7 @@ const portugalSeedActivities: SeedActivity[] = [
     address: "Toronto Pearson International Airport", googleMapsQuery: "Toronto Pearson International Airport", startTime: "21:30", endTime: "09:35",
     duration: "Overnight flight", travelTimeFromPrevious: "Start of trip", routeLegEstimate: "Start of trip", transportMode: "flight",
     estimatedCost: cadToEur(735.7), costCad: 735.7, costCategory: "flight", costStatus: "imported", bookingStatus: "booked",
-    isBooked: true, notes: "Wanderlog: Air Transat TS 480, confirmation YPTTO3.", source: "Wanderlog PDF", sourceId: "TS480",
+    isBooked: true, notes: "Wanderlog: Air Transat TS 480, booked.", source: "Wanderlog PDF", sourceId: "TS480",
     latitude: 43.6777, longitude: -79.6248,
   },
   {
@@ -448,7 +449,7 @@ const portugalSeedActivities: SeedActivity[] = [
     type: "flight", category: "Flight", description: "Airport pickup, coffee, bag drop, nap, and a low-key dinner.",
     address: "Humberto Delgado Airport, Lisbon, Portugal", googleMapsQuery: "Lisbon Airport", startTime: "06:30", duration: "Arrival morning",
     travelTimeFromPrevious: "Montreal to Lisbon arrives 6:30 AM", routeLegEstimate: "Montreal to Lisbon arrives 6:30 AM", transportMode: "flight",
-    estimatedCost: cadToEur(727.87), costCad: 727.87, costCategory: "flight", costStatus: "imported", bookingStatus: "booked", isBooked: true, notes: "Wanderlog: YTZ-YUL TS7463, YUL-LIS TS680, confirmation AO742L.", source: "Wanderlog PDF",
+    estimatedCost: cadToEur(727.87), costCad: 727.87, costCategory: "flight", costStatus: "imported", bookingStatus: "booked", isBooked: true, notes: "Wanderlog: YTZ-YUL TS7463 and YUL-LIS TS680, booked.", source: "Wanderlog PDF",
     latitude: 38.7742, longitude: -9.1342,
   },
   {
@@ -609,7 +610,7 @@ export const portugalFlights: TripFlight[] = [
     arrivalAirport: "Lisbon Airport (LIS)",
     departureTime: "2026-06-08T21:30:00",
     arrivalTime: "2026-06-09T09:35:00",
-    confirmation: "YPTTO3",
+    confirmation: "",
     status: "booked",
     notes: "Imported from Wanderlog flight section.",
     costCad: 735.7,
@@ -627,7 +628,7 @@ export const portugalFlights: TripFlight[] = [
     arrivalAirport: "Montreal (YUL)",
     departureTime: "2026-06-16T16:00:00",
     arrivalTime: "2026-06-16T17:15:00",
-    confirmation: "AO742L",
+    confirmation: "",
     status: "booked",
     notes: "Rachel outbound first leg. Imported from Wanderlog.",
     costCad: 727.87,
@@ -645,7 +646,7 @@ export const portugalFlights: TripFlight[] = [
     arrivalAirport: "Lisbon Airport (LIS)",
     departureTime: "2026-06-16T19:00:00",
     arrivalTime: "2026-06-17T06:30:00",
-    confirmation: "AO742L",
+    confirmation: "",
     status: "booked",
     notes: "Rachel outbound second leg. Plan airport transit.",
     costCad: 0,
@@ -862,5 +863,6 @@ export const portugalTrip: Trip = {
   flights: portugalFlights,
   hotels: portugalHotels,
   attachments: portugalAttachments,
-  notes: "Imported from /Users/nhihad/Downloads/Portugal_Mainland_Trip_Itinerary_June_2026.docx.pdf and /Users/nhihad/Downloads/Trip to Portugal – Wanderlog.pdf. Remaining booking focus: Lagos return transport, Lisbon-Porto driver day, Ponta da Piedade tour, Douro Valley tour, Sintra tickets, Gaia/cellar visit, special dinner, Livraria Lello.",
+  notes: "The planned route is preserved alongside an evidence-based actual-trip record imported from private local PDF sources.",
+  actuals: portugalActualTrip,
 };

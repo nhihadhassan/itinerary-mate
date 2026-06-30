@@ -28,3 +28,7 @@ pnpm-debug.log*
 coverage/
 playwright-report/
 test-results/
+
+# Private trip source documents
+docs/June 2026 e-statement.pdf
+docs/Trip to Portugal – Wanderlog.pdf

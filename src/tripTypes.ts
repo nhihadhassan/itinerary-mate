@@ -4,6 +4,9 @@ export type TripActivityType = "activity" | "food" | "hotel" | "flight" | "trans
 export type TripSource = "japan-default" | "Wanderlog" | "Wanderlog PDF" | "Google Doc" | "Google Doc PDF" | "manual" | "placeholder" | "needs confirmation";
 export type CostStatus = "imported" | "converted-estimate" | "needs-confirmation" | "manual";
 export type BookingStatus = "booked" | "not-booked" | "optional" | "needs-confirmation";
+export type ActualVisitStatus = "visited" | "unconfirmed" | "skipped";
+export type ActualVisitEvidence = "expense" | "dated-itinerary" | "manual";
+export type ActualExpenseCategory = "flight" | "lodging" | "food" | "drinks" | "groceries" | "activity" | "sightseeing" | "transport" | "shopping" | "other";
 export type TripCategory =
   | "Must See"
   | "Non-Negotiable"
@@ -144,6 +147,62 @@ export interface RouteSuggestion {
   detail: string;
 }
 
+export interface ActualExpense {
+  id: string;
+  tripId: TripId;
+  date: string;
+  merchant: string;
+  category: ActualExpenseCategory;
+  amount: number;
+  currency: "CAD" | "EUR";
+  cadEquivalent: number;
+  city: string;
+  visitId?: string;
+  payer?: string;
+  personalShareCad?: number;
+  isShared?: boolean;
+  source: "Wanderlog PDF";
+}
+
+export interface ActualVisit {
+  id: string;
+  tripId: TripId;
+  date: string;
+  day: number;
+  title: string;
+  city: string;
+  region: string;
+  status: ActualVisitStatus;
+  evidence: ActualVisitEvidence;
+  googleMapsQuery: string;
+  latitude?: number;
+  longitude?: number;
+  plannedActivityId?: string;
+  expenseIds: string[];
+  notes: string;
+}
+
+export interface TripJournalDay {
+  id: string;
+  date: string;
+  day: number;
+  chapter: string;
+  title: string;
+  summary: string;
+  visitIds: string[];
+  imageActivityTitle: string;
+}
+
+export interface TripActuals {
+  sourceTotalCad: number;
+  originalTotals: { CAD: number; EUR: number };
+  eurToCad: number;
+  expenses: ActualExpense[];
+  visits: ActualVisit[];
+  journalDays: TripJournalDay[];
+  sourceNote: string;
+}
+
 export interface Trip {
   id: TripId;
   title: string;
@@ -158,4 +217,5 @@ export interface Trip {
   hotels: TripHotel[];
   attachments: TripAttachment[];
   notes: string;
+  actuals?: TripActuals;
 }

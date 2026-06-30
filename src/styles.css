@@ -2792,6 +2792,968 @@ img {
   }
 }
 
+/* Portugal actual-trip record */
+.trip-mode-bar {
+  display: flex;
+  width: min(100% - 32px, 1384px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 10px auto 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-strong) 94%, var(--trip-accent-2));
+  padding: 8px 10px 8px 14px;
+  box-shadow: 0 8px 22px rgba(43, 54, 49, 0.06);
+}
+
+.trip-mode-bar > div:first-child {
+  display: grid;
+  gap: 1px;
+}
+
+.trip-mode-bar span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.trip-mode-bar strong {
+  font-size: 0.9rem;
+}
+
+.segmented-control {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(88px, 1fr));
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--soft);
+  padding: 3px;
+}
+
+.segmented-control button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.segmented-control button.active {
+  background: var(--surface-strong);
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(31, 47, 42, 0.12);
+}
+
+.main-grid.actual-trip-main-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.actual-trip-main-grid .content-stack {
+  grid-column: 1 / -1;
+  max-width: none;
+}
+
+.actual-dashboard,
+.actual-budget-view,
+.actual-places-view,
+.actual-maps-view,
+.portugal-journal {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.actual-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 24px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background:
+    linear-gradient(125deg, color-mix(in srgb, var(--trip-accent-2) 52%, var(--surface-strong)), var(--surface-strong) 58%);
+  padding: 22px;
+}
+
+.actual-hero h2 {
+  margin-top: 4px;
+  font-size: 2rem;
+  line-height: 1.08;
+}
+
+.actual-hero p:not(.eyebrow) {
+  max-width: 68ch;
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.actual-total-lockup,
+.actual-original-totals {
+  display: grid;
+  min-width: 210px;
+  justify-items: end;
+  gap: 2px;
+}
+
+.actual-total-lockup span,
+.actual-total-lockup small,
+.actual-original-totals span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.actual-total-lockup strong {
+  font-size: 1.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.actual-summary-band {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+}
+
+.actual-summary-band > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  border-right: 1px solid var(--line);
+  padding: 14px 16px;
+}
+
+.actual-summary-band > div:last-child {
+  border-right: 0;
+}
+
+.actual-summary-band span,
+.actual-summary-band small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.actual-summary-band strong {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  font-size: 1.45rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.actual-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.75fr);
+  gap: 14px;
+}
+
+.actual-overview-grid .overview-map-card {
+  position: relative;
+  top: auto;
+  height: 560px;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.actual-overview-grid .overview-map-canvas {
+  min-height: 0;
+  height: 100%;
+}
+
+.actual-route-panel,
+.actual-category-summary,
+.actual-confirmation-panel,
+.actual-budget-categories,
+.actual-ledger-panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  padding: 16px;
+}
+
+.actual-route-panel {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.actual-route-panel article {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.actual-route-panel article > div {
+  display: grid;
+  gap: 2px;
+}
+
+.actual-route-panel article span,
+.actual-currency-note span,
+.actual-currency-note small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.actual-route-panel article b {
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.actual-currency-note {
+  display: grid;
+  gap: 3px;
+  margin-top: 12px;
+  border-radius: 7px;
+  background: var(--soft);
+  padding: 12px;
+}
+
+.actual-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(330px, 0.65fr);
+  gap: 14px;
+}
+
+.actual-category-summary,
+.actual-confirmation-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.actual-progress-row {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) 90px;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+}
+
+.actual-progress-row > div {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--soft);
+}
+
+.actual-progress-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--trip-accent);
+}
+
+.actual-progress-row strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.actual-confirmation-panel label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.actual-confirmation-panel label > span {
+  display: grid;
+  gap: 2px;
+}
+
+.actual-confirmation-panel small,
+.actual-place-row span,
+.actual-visit-row small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.actual-section-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 2px 14px;
+}
+
+.actual-section-header h2 {
+  margin-top: 3px;
+  font-size: 1.65rem;
+}
+
+.actual-section-header > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.actual-itinerary-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.28fr) minmax(390px, 0.72fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.actual-day-ledger {
+  display: grid;
+  gap: 12px;
+}
+
+.actual-day-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+}
+
+.actual-day-card > header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--soft) 62%, var(--surface-strong));
+  padding: 15px;
+}
+
+.actual-day-card header h3 {
+  margin-top: 3px;
+}
+
+.actual-day-card header p:not(.eyebrow) {
+  max-width: 68ch;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.actual-day-card > header > strong {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 2px;
+  font-size: 0.92rem;
+}
+
+.actual-day-card > header > strong small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.actual-visit-list {
+  display: grid;
+}
+
+.actual-visit-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) 126px;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px;
+}
+
+.actual-visit-row:last-child {
+  border-bottom: 0;
+}
+
+.actual-visit-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.visit-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--trip-accent);
+}
+
+.status-unconfirmed .visit-status-dot {
+  background: var(--amber);
+}
+
+.status-skipped .visit-status-dot {
+  background: var(--muted);
+}
+
+.actual-itinerary-layout .map-panel.day-map-stack {
+  position: static;
+  max-height: none;
+  overflow: visible;
+}
+
+.actual-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.actual-toolbar .search-field {
+  flex: 1 1 auto;
+}
+
+.actual-toolbar select {
+  min-width: 168px;
+}
+
+.actual-place-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.actual-place-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  min-height: 112px;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-strong);
+  padding-right: 12px;
+}
+
+.actual-place-row img {
+  width: 96px;
+  height: 112px;
+  object-fit: cover;
+}
+
+.actual-place-row > div:nth-child(2) {
+  display: grid;
+  gap: 3px;
+}
+
+.actual-place-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actual-place-actions select {
+  width: 124px;
+}
+
+.actual-budget-hero h2 {
+  font-size: 2.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.actual-original-totals strong {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.actual-budget-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.actual-budget-categories {
+  display: grid;
+  gap: 3px;
+}
+
+.actual-budget-categories h3 {
+  margin-bottom: 8px;
+}
+
+.actual-budget-categories button {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  padding: 6px 4px;
+  text-align: left;
+}
+
+.actual-budget-categories button.active {
+  color: var(--green);
+}
+
+.actual-budget-categories button strong {
+  font-size: 0.78rem;
+}
+
+.actual-ledger-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.actual-ledger-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.actual-ledger-heading strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.actual-ledger {
+  display: grid;
+  max-height: 720px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+}
+
+.actual-ledger > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  align-items: center;
+  gap: 16px;
+  min-height: 58px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 4px;
+}
+
+.actual-ledger > div > span {
+  display: grid;
+  gap: 2px;
+}
+
+.actual-ledger > div > span:last-child {
+  justify-items: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.actual-ledger small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.actual-maps-view > .overview-map-card {
+  position: relative;
+  top: auto;
+  height: min(72vh, 720px);
+  min-height: 520px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.actual-maps-view .overview-map-canvas {
+  min-height: 0;
+  height: 100%;
+}
+
+.actual-map-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.actual-map-list a {
+  display: flex;
+  min-height: 60px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--ink);
+  padding: 10px 12px;
+  text-decoration: none;
+}
+
+.actual-map-list a span {
+  display: grid;
+  gap: 2px;
+}
+
+.actual-map-list small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.journal-hero {
+  position: relative;
+  min-height: 520px;
+  display: grid;
+  align-items: end;
+  overflow: hidden;
+  border-radius: 10px;
+  background-color: var(--ink);
+  background-position: center;
+  background-size: cover;
+}
+
+.journal-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(0deg, rgba(12, 24, 19, 0.9), rgba(12, 24, 19, 0.04) 72%);
+}
+
+.journal-hero > div {
+  position: relative;
+  z-index: 2;
+  max-width: 760px;
+  padding: 34px;
+  color: #f7faf6;
+}
+
+.journal-hero .eyebrow {
+  color: rgba(247, 250, 246, 0.74);
+}
+
+.journal-hero h2 {
+  margin-top: 6px;
+  color: #f7faf6;
+  font-size: 2.65rem;
+  line-height: 1.05;
+}
+
+.journal-hero p:not(.eyebrow) {
+  max-width: 64ch;
+  margin-top: 10px;
+  color: rgba(247, 250, 246, 0.84);
+  line-height: 1.55;
+}
+
+.journal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.journal-actions .ghost-button {
+  border-color: rgba(247, 250, 246, 0.42);
+  background: rgba(12, 24, 19, 0.54);
+  color: #f7faf6;
+}
+
+.journal-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.journal-facts span {
+  display: grid;
+  gap: 2px;
+  border-right: 1px solid var(--line);
+  padding: 16px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.journal-facts span:last-child {
+  border-right: 0;
+}
+
+.journal-facts strong {
+  color: var(--ink);
+  font-size: 1.15rem;
+}
+
+.journal-chapter {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
+  gap: 34px;
+  align-items: start;
+  padding: 28px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.journal-chapter.image-right figure {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.journal-chapter.image-right > div {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.journal-chapter figure {
+  position: sticky;
+  top: 16px;
+  margin: 0;
+}
+
+.journal-chapter figure img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.journal-chapter figcaption {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.journal-chapter h3 {
+  margin: 5px 0 16px;
+  font-size: 2rem;
+}
+
+.journal-day {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.journal-day > span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.journal-day h4 {
+  margin: 4px 0 6px;
+  font-size: 1.05rem;
+}
+
+.journal-day p {
+  max-width: 68ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.journal-day ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journal-day li {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--soft);
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.journal-spend-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 24px;
+  margin-top: 14px;
+  border-radius: 9px;
+  background: var(--trip-accent);
+  color: #f7faf6;
+  padding: 24px;
+}
+
+.journal-spend-section .eyebrow,
+.journal-spend-section p {
+  color: rgba(247, 250, 246, 0.78);
+}
+
+.journal-spend-section p {
+  max-width: 62ch;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.journal-spend-section > strong {
+  display: grid;
+  justify-items: end;
+  font-size: 1.7rem;
+}
+
+.journal-spend-section small {
+  font-size: 0.72rem;
+}
+
+.journal-ledger-details {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-strong);
+  padding: 0 16px 16px;
+}
+
+.journal-ledger-details summary {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+@media (max-width: 1120px) {
+  .actual-overview-grid,
+  .actual-review-row,
+  .actual-itinerary-layout,
+  .actual-budget-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actual-itinerary-layout .map-panel.day-map-stack {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .actual-place-grid,
+  .actual-map-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .trip-mode-bar,
+  .actual-hero,
+  .actual-section-header,
+  .actual-toolbar,
+  .journal-spend-section {
+    align-items: stretch;
+    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trip-mode-bar {
+    display: grid;
+    width: calc(100% - 20px);
+  }
+
+  .segmented-control {
+    width: 100%;
+  }
+
+  .actual-summary-band,
+  .journal-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .actual-summary-band > div:nth-child(2),
+  .journal-facts span:nth-child(2) {
+    border-right: 0;
+  }
+
+  .actual-summary-band > div:nth-child(-n + 2),
+  .journal-facts span:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .actual-overview-grid .overview-map-card,
+  .actual-maps-view > .overview-map-card {
+    height: 440px;
+    min-height: 440px;
+  }
+
+  .actual-place-grid,
+  .actual-map-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actual-place-row {
+    grid-template-columns: 76px minmax(0, 1fr);
+    padding-right: 10px;
+  }
+
+  .actual-place-row img {
+    width: 76px;
+    height: 100%;
+    min-height: 116px;
+  }
+
+  .actual-place-actions {
+    grid-column: 1 / -1;
+    justify-content: end;
+    padding: 0 0 10px;
+  }
+
+  .actual-day-card > header,
+  .actual-visit-row,
+  .actual-ledger > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actual-day-card > header > strong,
+  .actual-ledger > div > span:last-child {
+    justify-items: start;
+  }
+
+  .visit-status-dot {
+    display: none;
+  }
+
+  .actual-progress-row {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  .actual-progress-row strong {
+    grid-column: 2;
+  }
+
+  .actual-confirmation-panel label {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .journal-hero {
+    min-height: 500px;
+  }
+
+  .journal-hero > div {
+    padding: 22px;
+  }
+
+  .journal-hero h2 {
+    font-size: 2rem;
+  }
+
+  .journal-chapter,
+  .journal-chapter.image-right {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .journal-chapter.image-right figure,
+  .journal-chapter.image-right > div {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .journal-chapter figure {
+    position: static;
+  }
+
+  .journal-spend-section > strong {
+    justify-items: start;
+  }
+}
+
 /* Peru simplification pass: keep the imported trip useful, but far quieter. */
 .trip-peru .quick-card,
 .trip-portugal .quick-card {

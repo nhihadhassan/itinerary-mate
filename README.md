@@ -6,7 +6,7 @@ Itinerary Mate is a local-first multi-trip itinerary tracker built with Vite, Re
 
 - Japan Trip: the original September 1-30, 2026 planner with JPY source budgets and CAD comparison.
 - Peru Trip: a July 11-26, 2026 Wanderlog import enriched from the local Wanderlog PDF, with 55 dated cards, exact route-leg timing text, 16 daily route summaries, 4 flights, 10 lodging blocks, 2 train/transit blocks, 19 imported CAD expenses, and PEN + CAD planning displays.
-- Portugal Trip: a June 8-24, 2026 mainland Portugal plan imported from the local Google Docs PDF and Wanderlog PDF, with Lisbon, Lagos, Sintra, Porto, Douro Valley, booked flights, booked lodging, route timing text, map rows, calendar view, and EUR + CAD budgeting.
+- Portugal Trip: a June 8-24, 2026 mainland Portugal plan plus an evidence-based Actual mode with 57 visit records, 103 itemized expenses, a reconciled CA$4,563.76 total, actual-route maps, editable visit status, and an exportable travel Journal.
 
 The app is designed as a travel command center: editable cards, budget dashboards, lodging and flight tracking, attachment placeholders, route suggestions, OpenStreetMap-based map previews, CSV export, dark mode, and offline-ready PWA basics.
 
@@ -47,6 +47,7 @@ pnpm preview
 - `src/japanItinerary.ts`: Japan source itinerary and original budget route data.
 - `src/peruItinerary.ts`: Peru trip seed data, flights, hotels, attachments, and route suggestions.
 - `src/portugalItinerary.ts`: Portugal trip seed data from the Google Docs PDF and Wanderlog PDF, including flights, hotels, activities, attachments, route summaries, and region calendar blocks.
+- `src/portugalActualTrip.ts`: sanitized completed-trip visits, itemized expenses, journal chapters, and Markdown export data. Private source PDFs remain git-ignored.
 - `src/lib/placeParsing.ts`: Google Maps URL parsing helpers adapted from the MIT-licensed `Dobidop/easyItinerary` reference.
 - `src/lib/openMapServices.ts`: future-ready wrappers for free/open POI and routing services: Photon, Nominatim, Overpass, and OSRM.
 - `src/tripTypes.ts`: shared trip, activity, flight, hotel, attachment, and route suggestion types.
