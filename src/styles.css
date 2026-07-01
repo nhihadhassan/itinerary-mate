@@ -6663,30 +6663,6 @@ button:not(:disabled):active,
 }
 
 @media (max-width: 760px) {
-  .topbar-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .trip-switcher {
-    display: grid;
-    inline-size: 100%;
-    grid-template-columns: 1fr;
-  }
-
-  .trip-switcher button {
-    width: 100%;
-    justify-content: center;
-    white-space: normal;
-  }
-
-  .trip-switcher .discovery-global-button {
-    margin-left: 0;
-  }
-
-  .trip-switcher .discovery-global-button::before {
-    display: none;
-  }
-
   .nav-tabs {
     display: flex;
     overflow-x: auto;
@@ -6712,5 +6688,160 @@ button:not(:disabled):active,
 
   .branch-copy span {
     white-space: normal;
+  }
+}
+
+/* Compact mobile shell: keep the first viewport focused on the trip itself. */
+@media (max-width: 760px) {
+  html {
+    scroll-padding-top: 72px;
+  }
+
+  .topbar {
+    position: relative;
+    z-index: 1;
+    gap: 10px;
+    margin: -10px -10px 0;
+    padding: 14px 10px 10px;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .brand-block {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .brand-block .eyebrow {
+    order: 2;
+    font-size: 0.66rem;
+    white-space: nowrap;
+  }
+
+  .brand-block h1 {
+    font-size: 1.72rem;
+    line-height: 1.05;
+  }
+
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .topbar-actions .trip-switcher {
+    grid-column: auto;
+  }
+
+  .trip-switcher {
+    display: grid;
+    inline-size: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .trip-switcher button,
+  .topbar-actions > .ghost-button {
+    width: 100%;
+    min-height: 44px;
+    padding: 7px 5px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .topbar-actions > .ghost-button {
+    border-color: var(--line);
+    background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+    padding-inline: 0;
+  }
+
+  .theme-toggle-label {
+    display: none;
+  }
+
+  .trip-switcher .discovery-global-button {
+    margin-left: 0;
+  }
+
+  .trip-switcher .discovery-global-button::before {
+    display: none;
+  }
+
+  .nav-tabs,
+  .trip-peru .nav-tabs,
+  .trip-portugal .nav-tabs {
+    top: 0;
+    min-height: 52px;
+    margin-bottom: 12px;
+  }
+
+  .nav-tabs button {
+    min-height: 44px;
+  }
+
+  .trip-mode-bar {
+    display: flex;
+    width: calc(100% - 20px);
+    min-height: 58px;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 7px 8px 7px 12px;
+  }
+
+  .segmented-control {
+    width: auto;
+    flex: 0 0 auto;
+    grid-template-columns: repeat(2, minmax(72px, 1fr));
+  }
+
+  .segmented-control button {
+    min-height: 44px;
+  }
+
+  .content-stack {
+    order: 1;
+  }
+
+  .side-panel {
+    order: 2;
+  }
+
+  .day-rail,
+  .trip-peru .day-rail,
+  .trip-portugal .day-rail {
+    top: 58px;
+  }
+
+  .filter-bar,
+  .trip-peru .peru-filter-bar,
+  .trip-portugal .peru-filter-bar {
+    top: 126px;
+  }
+
+  .easy-overview-map-toolbar select,
+  .easy-overview-map-toolbar a,
+  .easy-overview-map-toolbar button {
+    min-height: 44px;
+  }
+
+  .easy-overview-map-toolbar button {
+    width: 44px;
+  }
+}
+
+@media (max-width: 380px) {
+  .trip-switcher button {
+    font-size: 0.71rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .brand-block .eyebrow {
+    display: none;
   }
 }

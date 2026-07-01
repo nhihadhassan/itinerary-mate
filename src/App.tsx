@@ -1191,7 +1191,7 @@ function App() {
         </aside>}
 
         <div className="content-stack">
-          {!isPortugalActual && !(bookedTripIds.has(activeTrip.id) && activeView === "dashboard") && !(activeTrip.id === "japan-2026" && activeView === "places") && !isTripCalendarView && !isDiscoveryView && (
+          {activeView !== "dashboard" && !isPortugalActual && !(activeTrip.id === "japan-2026" && activeView === "places") && !isTripCalendarView && !isDiscoveryView && (
             <FilterBar
               query={query}
               setQuery={setQuery}
@@ -1782,9 +1782,9 @@ function TripSwitcher({
   openDiscovery: () => void;
 }) {
   const labels: Record<TripId, string> = {
-    "japan-2026": "Japan Trip",
-    "peru-2026": "Peru Trip",
-    "portugal-2026": "Portugal Trip",
+    "japan-2026": "Japan",
+    "peru-2026": "Peru",
+    "portugal-2026": "Portugal",
   };
   return (
     <div className="trip-switcher" aria-label="Trip switcher">
@@ -1858,7 +1858,7 @@ function ThemeToggle({ preference, resolvedTheme, setPreference }: { preference:
   return (
     <button className="ghost-button" type="button" onClick={() => setPreference(next)} title="Toggle theme">
       {resolvedTheme === "dark" ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}
-      {preference === "dark" ? "Dark" : "Light"}
+      <span className="theme-toggle-label">{preference === "dark" ? "Dark" : "Light"}</span>
     </button>
   );
 }
