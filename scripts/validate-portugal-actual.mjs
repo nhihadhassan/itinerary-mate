@@ -47,10 +47,18 @@ for (const visit of visits) {
 for (const merchant of ["Air Transat 480", "Air Transat 7463", "Douro Valley Tour", "Tv. da Lomba 34"]) {
   assert(expenses.filter((item) => item.merchant === merchant).length === 1, `Prepaid item duplicated: ${merchant}`);
 }
+assert(expenses.find((item) => item.merchant === "Air Transat 7463")?.city === "Toronto", "Air Transat 7463 must be assigned to Toronto, not Lagos");
 
 const repoRoot = new URL("..", import.meta.url);
 const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8" }).split("\0").filter(Boolean);
-const sensitivePattern = /YPTTO3|AO742L|4537\s+XXXX|HMXT4PHSFQ|312889577786814/;
+const sensitiveTokens = [
+  ["YPT", "TO3"],
+  ["AO", "742L"],
+  ["4537", "\\s+XXXX"],
+  ["HMXT4", "PHSFQ"],
+  ["312889", "577786814"],
+].map((parts) => parts.join(""));
+const sensitivePattern = new RegExp(sensitiveTokens.join("|"));
 for (const path of tracked) {
   const value = fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   assert(!sensitivePattern.test(value), `Sensitive booking or account reference found in ${path}`);

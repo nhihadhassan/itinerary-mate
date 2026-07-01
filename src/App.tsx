@@ -1486,7 +1486,7 @@ function ActualTripOverview({ trip, updateVisit }: { trip: Trip; updateVisit: (i
           </div>
           {Array.from(new Set(actuals.journalDays.map((day) => day.chapter))).filter((chapter) => chapter !== "Departure").map((chapter) => {
             const chapterDays = actuals.journalDays.filter((day) => day.chapter === chapter);
-            const chapterSpend = actuals.expenses.filter((expense) => chapterDays.some((day) => day.date === expense.date)).reduce((sum, expense) => sum + expense.cadEquivalent, 0);
+            const chapterSpend = actuals.expenses.filter((expense) => expense.city === chapter).reduce((sum, expense) => sum + expense.cadEquivalent, 0);
             return <article key={chapter}><div><strong>{chapter}</strong><span>{chapterDays.length} {chapterDays.length === 1 ? "day" : "days"}</span></div><b>{cadLabel(chapterSpend)}</b></article>;
           })}
           <div className="actual-currency-note">

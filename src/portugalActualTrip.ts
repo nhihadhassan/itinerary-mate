@@ -78,7 +78,7 @@ const expenseSeeds: ExpenseSeed[] = [
   ["2026-06-16", "La Focaccia", "Food", 9.75, "CAD", "Lagos"],
   ["2026-06-16", "Souvenir", "Shopping", 12.02, "CAD", "Lagos"],
   ["2026-06-16", "The Original Grater", "Shopping", 16.24, "CAD", "Lagos"],
-  ["2026-06-16", "Air Transat 7463", "Flights", 727.87, "CAD", "Lagos"],
+  ["2026-06-16", "Air Transat 7463", "Flights", 727.87, "CAD", "Toronto"],
   ["2026-06-15", "Lagos Beer&Co", "Drinks", 4.86, "CAD", "Lagos"],
   ["2026-06-15", "Pizza Garage", "Food", 14.50, "CAD", "Lagos"],
   ["2026-06-14", "Kohinoor Indian Restaurant", "Food", 33.21, "CAD", "Lagos"],
