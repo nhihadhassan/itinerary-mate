@@ -3142,7 +3142,14 @@ img {
   line-height: 1.5;
 }
 
-.actual-day-card > header > strong {
+.actual-day-header-side {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 8px;
+}
+
+.actual-day-card > header strong {
   display: grid;
   justify-items: end;
   align-content: start;
@@ -3150,10 +3157,32 @@ img {
   font-size: 0.92rem;
 }
 
-.actual-day-card > header > strong small {
+.actual-day-card > header strong small {
   color: var(--muted);
   font-size: 0.7rem;
   font-weight: 650;
+}
+
+.actual-header-actions {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 8px;
+}
+
+.bulk-visit-button {
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.bulk-visit-button svg {
+  color: var(--green, #2f9e6d);
+}
+
+.bulk-visit-button:disabled svg {
+  color: currentColor;
 }
 
 .actual-visit-list {
@@ -3700,8 +3729,13 @@ img {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .actual-day-card > header > strong,
+  .actual-day-card > header strong,
   .actual-ledger > div > span:last-child {
+    justify-items: start;
+  }
+
+  .actual-day-header-side,
+  .actual-header-actions {
     justify-items: start;
   }
 
