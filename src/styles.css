@@ -3096,7 +3096,8 @@ img {
   font-size: 1.65rem;
 }
 
-.actual-section-header > span {
+.actual-section-header > span,
+.actual-header-actions > span {
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 750;
@@ -3178,7 +3179,7 @@ img {
 }
 
 .bulk-visit-button svg {
-  color: var(--green, #2f9e6d);
+  color: var(--green);
 }
 
 .bulk-visit-button:disabled svg {
