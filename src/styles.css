@@ -414,6 +414,15 @@ img {
   gap: 12px;
 }
 
+.dashboard-heading {
+  align-items: center;
+}
+
+.dashboard-heading p:not(.eyebrow) {
+  max-width: 64ch;
+  margin-top: 7px;
+}
+
 .eyebrow {
   color: var(--green);
   font-size: 0.74rem;
@@ -1222,6 +1231,22 @@ img {
   gap: 12px;
 }
 
+.compact-dashboard-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.overview-action-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.overview-action-strip .primary-button,
+.overview-action-strip .ghost-button {
+  min-height: 44px;
+}
+
 .metric-card,
 .anchor-card,
 .logistics-card,
@@ -1575,6 +1600,42 @@ img {
   background: rgba(16, 24, 22, 0.7);
 }
 
+.missing-visual {
+  display: grid;
+  min-height: 132px;
+  place-items: stretch;
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-strong) 78%, var(--trip-accent-2)), var(--surface-strong));
+}
+
+.missing-visual-content {
+  display: grid;
+  align-content: end;
+  gap: 6px;
+  padding: 16px;
+}
+
+.missing-visual-content span {
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.missing-visual-content strong {
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+.missing-visual-content small {
+  max-width: 24ch;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 @keyframes image-sheen {
   from {
     background-position: 180% 0, 0 0;
@@ -1836,6 +1897,21 @@ img {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 12px;
+}
+
+.quick-expense-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 1.3fr) minmax(110px, 0.55fr) minmax(110px, 0.55fr) minmax(130px, 0.65fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.quick-expense-form h3 {
+  margin-top: 4px;
+}
+
+.quick-expense-form .primary-button {
+  min-height: 44px;
 }
 
 .budget-row,
@@ -4687,7 +4763,7 @@ img {
 }
 
 .booked-dashboard-grid .peru-dashboard-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -6689,6 +6765,23 @@ button:not(:disabled):active,
   .branch-copy span {
     white-space: normal;
   }
+
+  .compact-dashboard-grid,
+  .booked-dashboard-grid .peru-dashboard-grid,
+  .quick-expense-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overview-action-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview-action-strip .primary-button,
+  .overview-action-strip .ghost-button,
+  .quick-expense-form .primary-button {
+    width: 100%;
+  }
 }
 
 /* Compact mobile shell: keep the first viewport focused on the trip itself. */
@@ -6843,5 +6936,95 @@ button:not(:disabled):active,
 @media (max-width: 520px) {
   .brand-block .eyebrow {
     display: none;
+  }
+}
+
+/* Refresh motion layer: stateful, restrained, and transform-only. */
+:root {
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.content-stack > section,
+.booked-overview-hero,
+.metric-card,
+.overview-logistics,
+.overview-checklist,
+.day-card,
+.place-card,
+.quick-expense-form {
+  animation: surface-enter 320ms var(--motion-ease) both;
+}
+
+.metric-card:nth-child(2),
+.day-card:nth-child(2),
+.place-card:nth-child(2) {
+  animation-delay: 35ms;
+}
+
+.metric-card:nth-child(3),
+.day-card:nth-child(3),
+.place-card:nth-child(3) {
+  animation-delay: 70ms;
+}
+
+.metric-card:nth-child(4),
+.day-card:nth-child(4),
+.place-card:nth-child(4) {
+  animation-delay: 105ms;
+}
+
+.place-card:hover,
+.day-card:hover,
+.overview-logistics:hover,
+.overview-checklist:hover {
+  transform: translateY(-2px);
+}
+
+.expanded-panel {
+  animation: panel-open 220ms var(--motion-ease) both;
+  transform-origin: top center;
+}
+
+.nav-tabs button.active {
+  transform: translateY(-1px);
+}
+
+.save-pill svg {
+  animation: save-pulse 1900ms var(--motion-ease) infinite;
+}
+
+@keyframes surface-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes panel-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes save-pulse {
+  0%,
+  72%,
+  100% {
+    transform: scale(1);
+  }
+
+  84% {
+    transform: scale(1.12);
   }
 }

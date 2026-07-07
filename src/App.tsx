@@ -104,12 +104,12 @@ const calendarTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
 const bookedTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
 
 const baseNavItems: Array<{ id: AppView; label: string }> = [
-  { id: "dashboard", label: "Overview" },
-  { id: "itinerary", label: "Itinerary" },
+  { id: "dashboard", label: "Today" },
+  { id: "itinerary", label: "Plan" },
   { id: "places", label: "Explore" },
   { id: "budget", label: "Budget" },
-  { id: "maps", label: "Map / Export" },
-  { id: "more", label: "Resources" },
+  { id: "maps", label: "Map" },
+  { id: "more", label: "More" },
 ];
 
 const categoryOptions: TripCategory[] = [
@@ -853,48 +853,54 @@ function App() {
     });
   }
 
-  function addActivity() {
+  function addActivity(patch: Partial<TripActivity> = {}, nextView: AppView = "itinerary") {
     const id = `${activeTrip.id}-custom-${Date.now()}`;
-    const newActivity: TripActivity = {
+    const title = patch.title || "New custom activity";
+    const day = patch.day || (selectedDay === "All" ? 1 : selectedDay);
+    const city = patch.city || (selectedCity === "All" ? activeTrip.country : selectedCity);
+    const localCost = Number(patch.costLocal ?? patch.estimatedCost ?? 0);
+    const baseActivity: TripActivity = {
       id,
       tripId: activeTrip.id,
-      day: selectedDay === "All" ? 1 : selectedDay,
-      date: activeTrip.startDate,
-      city: selectedCity === "All" ? activeTrip.country : selectedCity,
+      day,
+      date: dateForTripDay(activeTrip.startDate, day),
+      city,
       country: activeTrip.country,
-      title: "New custom activity",
+      title,
       type: "activity",
       description: "Add why this belongs on the trip.",
       category: "Nice To Have",
       address: "",
-      googleMapsQuery: `New custom activity ${activeTrip.country}`,
+      googleMapsQuery: `${title} ${city} ${activeTrip.country}`,
       duration: "1-2 hr",
       travelTimeFromPrevious: "Add estimate",
       transportMode: "",
-      estimatedCost: 0,
-      estimatedCostLow: activeTrip.currency === "JPY" ? 0 : undefined,
-      estimatedCostMid: activeTrip.currency === "JPY" ? 0 : undefined,
-      estimatedCostHigh: activeTrip.currency === "JPY" ? 0 : undefined,
+      estimatedCost: localCost,
+      estimatedCostLow: activeTrip.currency === "JPY" ? localCost : undefined,
+      estimatedCostMid: activeTrip.currency === "JPY" ? localCost : undefined,
+      estimatedCostHigh: activeTrip.currency === "JPY" ? localCost : undefined,
       currency: activeTrip.currency,
-      costLocal: 0,
+      costLocal: localCost,
       localCurrencyCode: activeTrip.currency,
-      costCad: 0,
+      costCad: Number((localCost / activeExchangeRate).toFixed(2)),
       costCategory: "activity",
       costStatus: "manual",
       bookingStatus: "not-booked",
       attachmentIds: [],
       notes: "",
-      imageUrl: placeholderFor("Custom activity"),
-      imageAlt: "Image-style placeholder for a custom activity.",
+      imageUrl: "",
+      imageAlt: "",
       priority: 3,
       isBooked: false,
       isCompleted: false,
       source: "manual",
     };
+    const newActivity: TripActivity = { ...baseActivity, ...patch, id, tripId: activeTrip.id };
     updateActiveTrip({ activities: [newActivity, ...activeTrip.activities] });
     setExpandedId(id);
     setSelectedDay(newActivity.day);
-    setActiveView("itinerary");
+    setActiveView(nextView);
+    setSaveStatus(`Added ${newActivity.title}`);
   }
 
   function addJapanExplorePlace(place: JapanExplorePlace, day: number) {
@@ -1086,9 +1092,9 @@ function App() {
       <header className="topbar">
         <a className="skip-link" href="#main-content">Skip to itinerary</a>
         <div className="brand-block">
-          <p className="eyebrow">Local-first travel command center</p>
-          <h1>Itinerary Mate</h1>
-          {!bookedTripIds.has(activeTrip.id) && <p>{activeTrip.description}</p>}
+          <p className="eyebrow">Itinerary Mate</p>
+          <h1>{activeTrip.title}</h1>
+          <p>{[formatDate(activeTrip.startDate), formatDate(activeTrip.endDate)].filter(Boolean).join(" to ")} · {allVisibleActivities.length} stops</p>
         </div>
         <div className="topbar-actions">
           <TripSwitcher
@@ -1221,6 +1227,8 @@ function App() {
               exchangeRate={activeExchangeRate}
               routeSuggestions={routeSuggestions}
               checklistItems={checklists[activeTrip.id] || []}
+              openView={openView}
+              addActivity={addActivity}
               addChecklistItem={addChecklistItem}
               toggleChecklistItem={toggleChecklistItem}
               deleteChecklistItem={deleteChecklistItem}
@@ -1331,7 +1339,7 @@ function App() {
           )}
 
           {activeView === "budget" && !isPortugalActual && (
-            <BudgetDashboard trip={activeTrip} activities={allVisibleActivities} budget={budget} updateActivity={updateActivity} exchangeRate={activeExchangeRate} />
+            <BudgetDashboard trip={activeTrip} activities={allVisibleActivities} budget={budget} updateActivity={updateActivity} addActivity={(patch) => addActivity(patch, "budget")} exchangeRate={activeExchangeRate} />
           )}
 
           {activeView === "maps" && isPortugalActual && activeTrip.actuals && (
@@ -1464,9 +1472,9 @@ function ActualTripOverview({ trip, updateVisit }: { trip: Trip; updateVisit: (i
           <p>Seventeen days from Lisbon to the Algarve, back through Sintra, then north to Porto and the Douro Valley.</p>
         </div>
         <div className="actual-total-lockup">
-          <span>Whole-trip spend</span>
+          <span>Total spent</span>
           <strong>{cadLabel(actuals.sourceTotalCad)}</strong>
-          <small>Wanderlog reconciled total</small>
+          <small>Imported expense ledger</small>
         </div>
       </header>
 
@@ -1935,6 +1943,8 @@ function Dashboard({
   exchangeRate,
   routeSuggestions,
   checklistItems,
+  openView,
+  addActivity,
   addChecklistItem,
   toggleChecklistItem,
   deleteChecklistItem,
@@ -1945,6 +1955,8 @@ function Dashboard({
   exchangeRate: number;
   routeSuggestions: RouteSuggestion[];
   checklistItems: ChecklistItem[];
+  openView: (view: AppView) => void;
+  addActivity: (patch?: Partial<TripActivity>) => void;
   addChecklistItem: (text: string) => void;
   toggleChecklistItem: (id: string, isDone: boolean) => void;
   deleteChecklistItem: (id: string) => void;
@@ -1953,9 +1965,13 @@ function Dashboard({
   const incomplete = activities.filter((activity) => !activity.isCompleted).length;
   const nextFlight = trip.flights.find((flight) => new Date(flight.departureTime).getTime() >= Date.now()) || trip.flights[0];
   const nextHotel = trip.hotels[0];
+  const nextStop = activities.find((activity) => !activity.isCompleted) || activities[0];
   const totalDays = Math.max(...activities.map((activity) => activity.day), 1);
   const reservationCount = trip.flights.length + trip.hotels.length + activities.filter((activity) => activity.type === "transport" || activity.type === "flight" || activity.category === "Transit" || activity.category === "Flight").length;
   const savedLinks = trip.attachments.length + activities.filter((activity) => activity.googleMapsQuery || activity.sourceUrl || activity.address).length;
+  const attentionCount = routeSuggestions.length + activities.filter((activity) => activity.needsConfirmationReasons?.length || activity.costStatus === "needs-confirmation" || activity.bookingStatus === "needs-confirmation").length;
+  const tripDates = [formatDate(trip.startDate), formatDate(trip.endDate)].filter(Boolean).join(" to ");
+  const routeStops = Array.from(new Set(activities.filter((activity) => activity.country === trip.country).map((activity) => activity.region || activity.city))).filter(Boolean).slice(0, 7);
   if (bookedTripIds.has(trip.id)) {
     const anchorTitles = trip.id === "portugal-2026"
       ? ["Lisbon soft start", "Algarve reset", "Sintra together", "Porto and Douro"]
@@ -1966,31 +1982,35 @@ function Dashboard({
           <div className="booked-overview-main">
             <div className="booked-overview-hero">
               <div>
-                <p className="eyebrow">{formatDate(trip.startDate)} to {formatDate(trip.endDate)}</p>
+                <p className="eyebrow">{tripDates}</p>
                 <h2>{trip.title}</h2>
-                <p>{trip.description}</p>
+                <p>{totalDays} days, {activities.length} stops, {reservationCount} bookings and transfers.</p>
               </div>
               <div className="overview-route-strip" aria-label={`${trip.country} trip regions`}>
-                {Array.from(new Set(activities.filter((activity) => activity.country === trip.country).map((activity) => activity.region || activity.city))).filter(Boolean).slice(0, 7).map((place) => (
+                {routeStops.map((place) => (
                   <span key={place}>{place}</span>
                 ))}
               </div>
-              <div className="button-row">
-                <button className="ghost-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(2)")?.click()}>
-                  Open itinerary
+              <div className="overview-action-strip">
+                <button className="primary-button" type="button" onClick={() => openView("itinerary")}>
+                  <CalendarDays size={17} aria-hidden="true" /> Plan day
                 </button>
-                <button className="primary-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".nav-tabs button:nth-child(3)")?.click()}>
-                  <CalendarDays size={17} aria-hidden="true" /> Open calendar
+                <button className="ghost-button" type="button" onClick={() => addActivity()}>
+                  <Plus size={17} aria-hidden="true" /> Add place
+                </button>
+                <button className="ghost-button" type="button" onClick={() => openView("budget")}>
+                  <CircleDollarSign size={17} aria-hidden="true" /> Add expense
+                </button>
+                <button className="ghost-button" type="button" onClick={() => openView("maps")}>
+                  <MapIcon size={17} aria-hidden="true" /> Map
                 </button>
               </div>
             </div>
             <div className="dashboard-grid peru-dashboard-grid">
-              <MetricCard label="Budget spent" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={formatLocalOnly(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
               <MetricCard label="Days" value={String(totalDays)} detail={`${activities.length} stops`} icon={<CalendarDays size={18} />} />
-              <MetricCard label="Activities" value={String(activities.length)} detail={`${reservationCount} reservations / transport`} icon={<MapPin size={18} />} />
-              <MetricCard label="Saved links" value={String(savedLinks)} detail={`${trip.attachments.length} attachments`} icon={<Bookmark size={18} />} />
-              <MetricCard label="Booked" value={String(booked)} detail={`${incomplete} incomplete`} icon={<BadgeCheck size={18} />} />
-              <MetricCard label="Next stay" value={nextHotel?.name || "No hotel"} detail={nextHotel ? nextHotel.city : "Add lodging later"} icon={<Hotel size={18} />} />
+              <MetricCard label="Budget" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={formatLocalOnly(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
+              <MetricCard label="Bookings" value={String(booked)} detail={`${reservationCount} reservations / transport`} icon={<BadgeCheck size={18} />} />
+              <MetricCard label="Needs attention" value={String(attentionCount)} detail={`${incomplete} open items`} icon={<TriangleAlert size={18} />} />
             </div>
             <div className="booked-overview-card-grid">
               <div className="overview-feature-pair">
@@ -2037,22 +2057,25 @@ function Dashboard({
   }
   return (
     <section className="content-section">
-      <div className="section-heading">
+      <div className="section-heading dashboard-heading">
         <div>
-          <p className="eyebrow">Trip dashboard</p>
+          <p className="eyebrow">{tripDates}</p>
           <h2>{trip.title}</h2>
+          <p>{nextStop ? `Next up: ${nextStop.title} in ${nextStop.city}.` : "Start by adding the first place or booking."}</p>
         </div>
         <Sparkles size={22} aria-hidden="true" />
       </div>
-      <div className="dashboard-grid">
+      <div className="overview-action-strip">
+        <button className="primary-button" type="button" onClick={() => openView("itinerary")}><CalendarDays size={17} aria-hidden="true" /> Plan day</button>
+        <button className="ghost-button" type="button" onClick={() => addActivity()}><Plus size={17} aria-hidden="true" /> Add place</button>
+        <button className="ghost-button" type="button" onClick={() => openView("budget")}><CircleDollarSign size={17} aria-hidden="true" /> Add expense</button>
+        <button className="ghost-button" type="button" onClick={() => openView("maps")}><MapIcon size={17} aria-hidden="true" /> Map</button>
+      </div>
+      <div className="dashboard-grid compact-dashboard-grid">
         <MetricCard label="Days" value={String(totalDays)} detail={`${formatDate(trip.startDate)} to ${formatDate(trip.endDate)}`} icon={<CalendarDays size={18} />} />
-        <MetricCard label="Budget spent" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={getLocalCostSubtext(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
-        <MetricCard label="Activities" value={String(activities.length)} detail={`${reservationCount} reservations / transport`} icon={<MapPin size={18} />} />
-        <MetricCard label="Saved links" value={String(savedLinks)} detail={`${trip.attachments.length} attachments`} icon={<Bookmark size={18} />} />
-        <MetricCard label="Booked items" value={String(booked)} detail="Includes manual flight records" icon={<BadgeCheck size={18} />} />
-        <MetricCard label="Incomplete" value={String(incomplete)} detail="Activities still open" icon={<CheckCircle2 size={18} />} />
-        <MetricCard label="Next flight" value={nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : "Add flight"} detail={nextFlight ? `${nextFlight.departureAirport} to ${nextFlight.arrivalAirport}` : "Manual tracker ready"} icon={<Plane size={18} />} />
-        <MetricCard label="Next hotel" value={nextHotel?.name || "Add hotel"} detail={nextHotel ? `${nextHotel.city}, ${nextHotel.country}` : "Lodging tracker ready"} icon={<Hotel size={18} />} />
+        <MetricCard label="Budget" value={formatCadOnly(budget.total.mid, exchangeRate)} detail={getLocalCostSubtext(budget.total.mid, trip.currency)} icon={<CircleDollarSign size={18} />} />
+        <MetricCard label="Bookings" value={String(booked)} detail={nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : `${savedLinks} map links`} icon={<BadgeCheck size={18} />} />
+        <MetricCard label="Needs attention" value={String(attentionCount)} detail={nextHotel ? nextHotel.name : `${incomplete} open items`} icon={<TriangleAlert size={18} />} />
       </div>
 
       {trip.id === "japan-2026" ? (
@@ -3592,7 +3615,7 @@ function ActivityCard({
   return (
     <article className={`place-card ${variant === "compact" ? "itinerary-card" : ""} ${hasImage ? "has-real-image" : "no-real-image"} type-${activity.type || "activity"}${activity.isCompleted ? " completed" : ""}`} ref={setNodeRef} style={style}>
       {stopNumber && <span className="pin-badge" aria-label={`Stop ${stopNumber}`}>{stopNumber}</span>}
-      <div className={`card-image ${hasImage ? "has-photo" : "fallback-visual"} ${hasImage && !imageLoaded ? "is-loading" : ""}`} style={{ background: hasImage ? undefined : activity.imageUrl || placeholderFor(activity.title) }}>
+      <div className={`card-image ${hasImage ? "has-photo" : "missing-visual"} ${hasImage && !imageLoaded ? "is-loading" : ""}`}>
         {hasImage ? (
           <>
             <span className="image-skeleton" aria-hidden="true" />
@@ -3607,10 +3630,10 @@ function ActivityCard({
             />
           </>
         ) : (
-          <div className="fallback-visual-content" aria-hidden="true">
+          <div className="missing-visual-content">
             <span>{visualKicker(activity)}</span>
-            <strong>{placeInitials(activity.title)}</strong>
-            <small>{activity.type || activity.category}</small>
+            <strong>Photo missing</strong>
+            <small>Add a real image URL when this stop needs a visual.</small>
           </div>
         )}
         <button className="drag-handle" type="button" {...listeners} {...attributes} aria-label={`Drag ${activity.title}`}>
@@ -3660,7 +3683,7 @@ function ActivityCard({
               <label className="field"><span>Cost ({activity.localCurrencyCode || activity.currency})</span><input type="number" min="0" value={activity.costLocal ?? activity.estimatedCost} onChange={(event) => updateActivity(activity.id, { estimatedCost: Number(event.target.value) })} /></label>
               <label className="field"><span>Duration</span><input value={activity.duration} onChange={(event) => updateActivity(activity.id, { duration: event.target.value })} /></label>
               <label className="field"><span>Travel time</span><input value={activity.travelTimeFromPrevious || ""} onChange={(event) => updateActivity(activity.id, { travelTimeFromPrevious: event.target.value })} /></label>
-              <label className="field"><span>Image URL</span><input value={activity.imageUrl} onChange={(event) => updateActivity(activity.id, { imageUrl: event.target.value })} /></label>
+              <label className="field"><span>Use image URL</span><input value={activity.imageUrl} onChange={(event) => updateActivity(activity.id, { imageUrl: event.target.value })} placeholder="https://..." /><small>Use a real destination image. Leave blank to keep the compact missing-photo state.</small></label>
             </div>
             <label className="field"><span>Notes</span><textarea value={activity.notes} onChange={(event) => updateActivity(activity.id, { notes: event.target.value })} placeholder="No notes yet" /></label>
             <div className="expanded-actions">
@@ -4131,7 +4154,21 @@ function PlacePreviewCard({
   );
 }
 
-function BudgetDashboard({ trip, activities, budget, updateActivity, exchangeRate }: { trip: Trip; activities: TripActivity[]; budget: ReturnType<typeof makeBudget>; updateActivity: (id: string, patch: Partial<TripActivity>) => void; exchangeRate: number }) {
+function BudgetDashboard({
+  trip,
+  activities,
+  budget,
+  updateActivity,
+  addActivity,
+  exchangeRate,
+}: {
+  trip: Trip;
+  activities: TripActivity[];
+  budget: ReturnType<typeof makeBudget>;
+  updateActivity: (id: string, patch: Partial<TripActivity>) => void;
+  addActivity: (patch?: Partial<TripActivity>) => void;
+  exchangeRate: number;
+}) {
   const categoryRows = Object.entries(budget.categories);
   const dayRows = activities.reduce<Record<string, BudgetRange>>((acc, activity) => {
     const key = `Day ${activity.day}`;
@@ -4140,7 +4177,38 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, exchangeRat
   }, {});
   const [budgetQuery, setBudgetQuery] = useState("");
   const [budgetView, setBudgetView] = useState<"all" | "missing" | "flight" | "hotel" | "activity" | "food" | "transport" | "day" | "city">("all");
+  const [expenseTitle, setExpenseTitle] = useState("");
+  const [expenseCad, setExpenseCad] = useState("");
+  const [expenseDay, setExpenseDay] = useState(activities[0]?.day || 1);
+  const [expenseKind, setExpenseKind] = useState<"activity" | "food" | "transport" | "misc">("activity");
   const normalizedQuery = budgetQuery.trim().toLowerCase();
+  const days = Array.from(new Set(activities.map((activity) => activity.day))).sort((a, b) => a - b);
+  function submitExpense(event: FormEvent) {
+    event.preventDefault();
+    const amountCad = Number(expenseCad);
+    const cleanTitle = expenseTitle.trim();
+    if (!cleanTitle || !Number.isFinite(amountCad) || amountCad < 0) return;
+    const localCost = Math.round(amountCad * exchangeRate);
+    const category: TripCategory = expenseKind === "food" ? "Food" : expenseKind === "transport" ? "Transit" : expenseKind === "misc" ? "Note" : "Nice To Have";
+    addActivity({
+      day: expenseDay,
+      title: cleanTitle,
+      type: expenseKind === "misc" ? "note" : expenseKind,
+      category,
+      description: "Manual expense entry.",
+      duration: "Expense",
+      travelTimeFromPrevious: "",
+      estimatedCost: localCost,
+      costLocal: localCost,
+      costCad: amountCad,
+      costCategory: expenseKind,
+      costStatus: "manual",
+      imageUrl: "",
+      notes: "",
+    });
+    setExpenseTitle("");
+    setExpenseCad("");
+  }
   const budgetActivities = activities.filter((activity) => {
     const queryMatch = !normalizedQuery || [activity.title, activity.city, activity.category, activity.notes].join(" ").toLowerCase().includes(normalizedQuery);
     const missingMatch = budgetView !== "missing" || !activity.costLocal;
@@ -4195,6 +4263,36 @@ function BudgetDashboard({ trip, activities, budget, updateActivity, exchangeRat
           ))}
         </section>
       </div>
+      <form className="quick-expense-form inline-editor" onSubmit={submitExpense}>
+        <div>
+          <p className="eyebrow">Track money</p>
+          <h3>Add expense</h3>
+        </div>
+        <label className="field">
+          <span>Item</span>
+          <input value={expenseTitle} onChange={(event) => setExpenseTitle(event.target.value)} placeholder="Dinner, museum ticket, taxi" />
+        </label>
+        <label className="field">
+          <span>CAD</span>
+          <input type="number" min="0" step="0.01" value={expenseCad} onChange={(event) => setExpenseCad(event.target.value)} placeholder="0.00" />
+        </label>
+        <label className="field">
+          <span>Day</span>
+          <select value={expenseDay} onChange={(event) => setExpenseDay(Number(event.target.value))}>
+            {(days.length ? days : [1]).map((day) => <option key={day} value={day}>Day {day}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>Type</span>
+          <select value={expenseKind} onChange={(event) => setExpenseKind(event.target.value as typeof expenseKind)}>
+            <option value="activity">Activity</option>
+            <option value="food">Food</option>
+            <option value="transport">Transport</option>
+            <option value="misc">Other</option>
+          </select>
+        </label>
+        <button className="primary-button" type="submit"><Plus size={16} aria-hidden="true" /> Save expense</button>
+      </form>
       <section className="inline-editor">
         <h3>Quick cost edits</h3>
         <div className="budget-controls">
