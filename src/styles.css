@@ -104,6 +104,12 @@ html {
   overflow-x: hidden;
 }
 
+/* Without this the light cream showed through above the body gradient and
+   in the overscroll area in dark mode. */
+:root[data-theme="dark"] {
+  background: #0c1311;
+}
+
 body {
   margin: 0;
   color: var(--ink);
@@ -1778,12 +1784,11 @@ img {
   padding: var(--s-2) var(--s-2);
 }
 
+/* A day is a heading over a list of place cards, not a card wrapping cards. */
 .day-card {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(255, 253, 248, 0.84);
-  padding: var(--s-3);
-  box-shadow: var(--shadow-2);
+  padding: var(--s-3) 0 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
 }
 
 .day-details {
@@ -1902,7 +1907,6 @@ img {
 :root[data-theme="dark"] .hero-panel,
 :root[data-theme="dark"] .filter-bar,
 :root[data-theme="dark"] .day-column,
-:root[data-theme="dark"] .day-card,
 :root[data-theme="dark"] .place-card,
 :root[data-theme="dark"] .empty-state,
 :root[data-theme="dark"] .metric-card,
@@ -2141,19 +2145,26 @@ img {
 }
 
 /* Wanderlog-inspired route-first redesign */
+/* A page section is a grouping, not an object. Per DESIGN.md it is spacing
+   and a rule, not another card around the cards it contains - that nesting
+   was what made every screen read as card soup. */
 .content-section {
   display: grid;
   gap: var(--s-4);
   min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(255, 253, 248, 0.82);
-  padding: var(--s-3);
-  box-shadow: var(--shadow-2);
+  padding: var(--s-4) 0 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  box-shadow: none;
+}
+
+.content-section:first-child {
+  padding-top: 0;
+  border-top: none;
 }
 
 :root[data-theme="dark"] .content-section {
-  background: rgba(23, 33, 30, 0.9);
+  background: transparent;
   box-shadow: none;
 }
 
@@ -2641,10 +2652,8 @@ img {
 }
 
 .timeline .day-card {
-  padding: 0;
   overflow: hidden;
-  border-radius: var(--r-3);
-  background: var(--surface-strong);
+  background: transparent;
 }
 
 .day-summary {
@@ -5747,11 +5756,9 @@ img {
   color: #f0d996;
 }
 
-:root[data-theme="dark"] .content-section,
 :root[data-theme="dark"] .card,
 :root[data-theme="dark"] .hero-panel,
 :root[data-theme="dark"] .day-column,
-:root[data-theme="dark"] .day-card,
 :root[data-theme="dark"] .place-card,
 :root[data-theme="dark"] .map-panel,
 :root[data-theme="dark"] .overview-map-card,
@@ -6574,7 +6581,6 @@ button:not(:disabled):active,
 }
 
 .card,
-.content-section,
 .place-card,
 .map-panel,
 .metric-card,
@@ -6738,7 +6744,6 @@ button:not(:disabled):active,
     padding: var(--s-2) var(--s-2);
   }
 
-  .content-section,
   .filter-bar,
   .japan-explore-toolbar {
     border-radius: var(--r-2);
@@ -6963,7 +6968,6 @@ button:not(:disabled):active,
 }
 
 .place-card:hover,
-.day-card:hover,
 .overview-logistics:hover,
 .overview-checklist:hover {
   transform: translateY(-2px);
