@@ -112,6 +112,9 @@ const baseNavItems: Array<{ id: AppView; label: string }> = [
   { id: "more", label: "More" },
 ];
 
+/** Views that browse the activity list, and so can be usefully filtered. */
+const FILTERABLE_VIEWS = new Set<AppView>(["itinerary", "places"]);
+
 const categoryOptions: TripCategory[] = [
   "Must See",
   "Non-Negotiable",
@@ -1197,7 +1200,10 @@ function App() {
         </aside>}
 
         <div className="content-stack">
-          {activeView !== "dashboard" && !isPortugalActual && !(activeTrip.id === "japan-2026" && activeView === "places") && !isTripCalendarView && !isDiscoveryView && (
+          {/* The filter bar only belongs on views that browse the activity
+              list. Budget and Map read the full set, so showing it there put
+              inert search and "Add place" controls above unrelated content. */}
+          {FILTERABLE_VIEWS.has(activeView) && !isPortugalActual && !(activeTrip.id === "japan-2026" && activeView === "places") && !isTripCalendarView && !isDiscoveryView && (
             <FilterBar
               query={query}
               setQuery={setQuery}
@@ -1349,7 +1355,9 @@ function App() {
           {activeView === "maps" && !isPortugalActual && (
             <MapsExport
               trip={activeTrip}
-              activities={selectedDayActivities.length ? selectedDayActivities : filteredActivities}
+              /* Map has no filter bar of its own, so it must not inherit a
+                 filter set on Plan - that would silently truncate the export. */
+              activities={selectedDayActivities.length ? selectedDayActivities : allVisibleActivities}
               allActivities={allVisibleActivities}
               copyRows={async (rows) => {
                 await copyText(rows.map((row) => `${row.place} | ${row.address || row.query} | Day ${row.day} | ${row.category} | ${row.estimatedCost} ${row.currency} | CAD ${row.cadCost || "estimate"} | ${row.notes}`).join("\n"));

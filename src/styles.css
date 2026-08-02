@@ -60,6 +60,9 @@
   /* Elevation: resting surface, raised surface. */
   --shadow-1: 0 1px 2px rgba(31, 47, 42, 0.05);
   --ring: 0 0 0 3px color-mix(in srgb, var(--trip-accent) 22%, transparent);
+
+  /* Foreground for text sitting on an accent-filled surface. Flips with theme. */
+  --on-accent: #fffdf8;
   --shadow-2: 0 18px 50px rgba(31, 47, 42, 0.1);
 }
 
@@ -87,6 +90,7 @@
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
   --ring: 0 0 0 3px color-mix(in srgb, var(--trip-accent) 30%, transparent);
+  --on-accent: #101816;
   --shadow-2: 0 18px 50px rgba(0, 0, 0, 0.34);
 }
 
@@ -616,7 +620,7 @@ img {
 
 .primary-button {
   background: var(--green);
-  color: white;
+  color: var(--on-accent);
   font-weight: 750;
 }
 
@@ -1937,9 +1941,12 @@ img {
   gap: var(--s-3);
 }
 
+/* Six fixed-minimum columns needed ~920px and could not shrink, so this row
+   blew out the width of every .content-section that contained it. Wrap
+   instead of forcing one line. */
 .quick-expense-form {
   display: grid;
-  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 1.3fr) minmax(110px, 0.55fr) minmax(110px, 0.55fr) minmax(130px, 0.65fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   align-items: end;
   gap: var(--s-3);
 }
@@ -2282,7 +2289,7 @@ img {
   border: 1px solid color-mix(in srgb, var(--trip-accent) 30%, var(--line));
   border-radius: var(--r-2);
   background: var(--trip-accent);
-  color: #fff;
+  color: var(--on-accent);
   padding: 0 var(--s-3);
   font-weight: 800;
 }
@@ -2583,7 +2590,7 @@ img {
   justify-content: center;
   border-radius: var(--r-pill);
   background: var(--blue);
-  color: white;
+  color: var(--on-accent);
   font-size: var(--t-2);
   font-weight: 850;
 }
