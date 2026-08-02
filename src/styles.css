@@ -344,12 +344,17 @@ img {
   border-color: color-mix(in srgb, var(--trip-accent) 24%, var(--line));
 }
 
+/* The single source of truth for the section nav. This used to be spread
+   across 11 rules in 6 media queries, with grid-template-columns set 9 times
+   and per-trip column-count overrides; auto-fit handles 6, 7, or 8 items
+   without any of that. */
 .nav-tabs {
   position: sticky;
   top: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: var(--s-1);
   margin: var(--s-2) 0 var(--s-4);
   border: 1px solid var(--line);
@@ -357,6 +362,16 @@ img {
   background: rgba(255, 253, 248, 0.92);
   padding: var(--s-1);
   backdrop-filter: blur(16px);
+}
+
+/* Mobile: wrap to rows instead of scrolling sideways. Every section stays
+   reachable without a swipe, and the strip stops clipping the active tab. */
+@media (max-width: 760px) {
+  .nav-tabs {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: var(--s-3);
+  }
 }
 
 .nav-tabs button,
@@ -530,15 +545,59 @@ img {
   font-weight: 550;
 }
 
+/* Single source of truth for the filter bar. It used to be sticky with `top`
+   set to six different values across six media queries, all trying to clear
+   the sticky nav above it. It is not sticky any more, which removes that
+   whole class of bug. */
 .filter-bar {
-  position: sticky;
-  top: 60px;
-  z-index: 35;
   display: grid;
   gap: var(--s-2);
   padding: var(--s-2);
   background: rgba(255, 253, 248, 0.94);
-  backdrop-filter: blur(18px);
+}
+
+.filter-primary-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) auto auto auto;
+  gap: var(--s-2);
+  align-items: center;
+}
+
+.filter-extra {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 220px);
+  gap: var(--s-2);
+  align-items: end;
+}
+
+/* The "Filters" disclosure is mobile-only; on desktop there is room to keep
+   the category chips and city select on screen. */
+.filter-toggle {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .filter-primary-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-toggle {
+    display: inline-flex;
+  }
+
+  .filter-primary-row .search-field,
+  .filter-primary-row .ghost-button:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .filter-extra {
+    display: none;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filter-extra.open {
+    display: grid;
+  }
 }
 
 .search-field {
@@ -1121,11 +1180,6 @@ img {
     grid-template-columns: 1fr auto;
   }
 
-  .filter-bar {
-    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1.5fr) 170px auto;
-    align-items: end;
-  }
-
   .hero-panel {
     grid-template-columns: minmax(0, 1.3fr) minmax(240px, 0.7fr);
     align-items: end;
@@ -1170,14 +1224,6 @@ img {
   .side-panel {
     position: sticky;
     top: 78px;
-  }
-
-  .nav-tabs {
-    top: 10px;
-  }
-
-  .filter-bar {
-    top: 72px;
   }
 
   .timeline {
@@ -1237,11 +1283,6 @@ img {
 
   .place-title-row .drag-handle {
     display: none;
-  }
-
-  .nav-tabs {
-    overflow-x: auto;
-    grid-template-columns: repeat(8, minmax(92px, 1fr));
   }
 
   .hero-panel {
@@ -1332,13 +1373,6 @@ img {
   justify-content: center;
   background: var(--green-2);
   color: var(--green);
-}
-
-.filter-selects {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--s-2);
-  align-items: end;
 }
 
 .chip-row {
@@ -2055,10 +2089,6 @@ img {
 }
 
 @media (min-width: 900px) {
-  .nav-tabs {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-  }
-
   .wanderlog-timeline .place-card {
     grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
     align-items: stretch;
@@ -2099,10 +2129,6 @@ img {
 
   .trip-switcher .discovery-global-button::before {
     display: none;
-  }
-
-  .nav-tabs {
-    grid-template-columns: repeat(8, minmax(94px, 1fr));
   }
 
   .budget-edit-row {
@@ -2798,9 +2824,6 @@ img {
 }
 
 @media (min-width: 900px) {
-  .nav-tabs {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-  }
 }
 
 @media (min-width: 1080px) {
@@ -2862,19 +2885,8 @@ img {
     display: none;
   }
 
-  .nav-tabs {
-    top: 86px;
-    overflow-x: auto;
-    grid-template-columns: repeat(7, minmax(92px, 1fr));
-    margin-top: 0;
-  }
-
   .day-rail {
     top: 144px;
-  }
-
-  .filter-bar {
-    position: static;
   }
 
   .map-canvas {
@@ -5392,16 +5404,6 @@ img {
 }
 
 /* Focused cleanup pass: quieter controls, consistent trip cards, stable sticky bars. */
-.nav-tabs {
-  top: 0;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.trip-peru .nav-tabs,
-.trip-portugal .nav-tabs {
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-}
-
 .day-rail,
 .trip-peru .day-rail,
 .trip-portugal .day-rail {
@@ -5412,17 +5414,6 @@ img {
   padding: var(--s-1) var(--s-05) var(--s-2);
   background: color-mix(in srgb, var(--surface) 84%, transparent);
   backdrop-filter: blur(16px);
-}
-
-.filter-bar,
-.trip-peru .peru-filter-bar,
-.trip-portugal .peru-filter-bar {
-  top: 144px;
-  z-index: 36;
-  grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.2fr);
-  align-items: center;
-  border-radius: var(--r-2);
-  box-shadow: var(--shadow-2);
 }
 
 .timeline.content-section {
@@ -5612,30 +5603,11 @@ img {
 }
 
 @media (max-width: 760px) {
-  .nav-tabs {
-    top: 86px;
-    grid-template-columns: repeat(7, minmax(92px, 1fr));
-  }
-
-  .trip-peru .nav-tabs,
-.trip-portugal .nav-tabs {
-    grid-template-columns: repeat(8, minmax(92px, 1fr));
-  }
-
   .day-rail,
   .trip-peru .day-rail,
 .trip-portugal .day-rail {
     top: 144px;
     margin-bottom: var(--s-2);
-  }
-
-  .filter-bar,
-  .trip-peru .peru-filter-bar,
-.trip-portugal .peru-filter-bar {
-    position: sticky;
-    top: 220px;
-    grid-template-columns: minmax(0, 1fr);
-    padding: var(--s-2);
   }
 
   .chip-row {
@@ -6566,9 +6538,7 @@ html {
 .day-rail,
 .filter-bar,
 .japan-explore-toolbar {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.72) inset,
-    0 14px 34px rgba(31, 47, 42, 0.08);
+  box-shadow: var(--shadow-1);
 }
 
 .nav-tabs button,
@@ -6742,12 +6712,14 @@ button:not(:disabled):active,
     text-overflow: ellipsis;
   }
 
+  /* The header used to eat most of the first screen on a phone. */
   .brand-block h1 {
-    font-size: var(--t-7);
+    font-size: var(--t-6);
+    max-width: none;
   }
 
-  .nav-tabs {
-    scrollbar-width: none;
+  .brand-block p {
+    font-size: var(--t-2);
   }
 
   .nav-tabs::-webkit-scrollbar {
@@ -6784,16 +6756,6 @@ button:not(:disabled):active,
 }
 
 @media (max-width: 760px) {
-  .nav-tabs {
-    display: flex;
-    overflow-x: auto;
-  }
-
-  .nav-tabs button {
-    flex: 0 0 auto;
-    min-width: 92px;
-  }
-
   .main-grid,
   .side-panel,
   .content-stack,
@@ -6909,18 +6871,6 @@ button:not(:disabled):active,
     display: none;
   }
 
-  .nav-tabs,
-  .trip-peru .nav-tabs,
-  .trip-portugal .nav-tabs {
-    top: 0;
-    min-height: 52px;
-    margin-bottom: var(--s-3);
-  }
-
-  .nav-tabs button {
-    min-height: 44px;
-  }
-
   .trip-mode-bar {
     display: flex;
     width: calc(100% - 20px);
@@ -6953,12 +6903,6 @@ button:not(:disabled):active,
   .trip-peru .day-rail,
   .trip-portugal .day-rail {
     top: 58px;
-  }
-
-  .filter-bar,
-  .trip-peru .peru-filter-bar,
-  .trip-portugal .peru-filter-bar {
-    top: 126px;
   }
 
   .easy-overview-map-toolbar select,

@@ -37,6 +37,7 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  SlidersHorizontal,
   Sun,
   Train,
   Trash2,
@@ -114,6 +115,21 @@ const baseNavItems: Array<{ id: AppView; label: string }> = [
 
 /** Views that browse the activity list, and so can be usefully filtered. */
 const FILTERABLE_VIEWS = new Set<AppView>(["itinerary", "places"]);
+
+/** Views that read `selectedDay`, and so need the day rail. Budget reads the
+ *  whole trip, so the rail was inert there. */
+const DAY_RAIL_VIEWS = new Set<AppView>(["itinerary", "places", "maps"]);
+
+/**
+ * Ref callback that pulls the selected item of a horizontal strip into view.
+ * Used for the nav tabs and the day rail, which both scroll on narrow screens.
+ */
+function scrollActiveIntoView(node: HTMLElement | null) {
+  if (!node) return;
+  const strip = node.parentElement;
+  if (!strip || strip.scrollWidth <= strip.clientWidth) return;
+  node.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+}
 
 const categoryOptions: TripCategory[] = [
   "Must See",
@@ -1125,7 +1141,15 @@ function App() {
 
       <nav className="nav-tabs" aria-label="Planner sections">
         {activeNavItems.map((item) => (
-          <button key={item.id} type="button" className={activeView === item.id ? "active" : ""} onClick={() => openView(item.id)}>
+          <button
+            key={item.id}
+            type="button"
+            className={activeView === item.id ? "active" : ""}
+            /* On narrow screens the tab strip scrolls, and the active tab
+               could sit off-screen or clipped mid-word. Keep it in view. */
+            ref={activeView === item.id ? scrollActiveIntoView : undefined}
+            onClick={() => openView(item.id)}
+          >
             {item.label}
           </button>
         ))}
@@ -1144,7 +1168,7 @@ function App() {
         </div>
       )}
 
-      {activeView !== "dashboard" && !isPortugalActual && !isJapanExploreView && !isTripCalendarView && !isDiscoveryView && (
+      {DAY_RAIL_VIEWS.has(activeView) && !isPortugalActual && !isJapanExploreView && !isTripCalendarView && !isDiscoveryView && (
         <DayRail
           days={days}
           activities={allVisibleActivities}
@@ -1856,6 +1880,7 @@ function DayRail({
             key={day}
             type="button"
             className={selectedDay === day ? "day-chip active" : "day-chip"}
+            ref={selectedDay === day ? scrollActiveIntoView : undefined}
             onClick={() => (jumpMode && onJumpToDay ? onJumpToDay(day) : setSelectedDay(day))}
           >
             <span>Day {day}</span>
@@ -1911,35 +1936,52 @@ function FilterBar(props: {
   tripId: TripId;
 }) {
   const isBookedTrip = bookedTripIds.has(props.tripId);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilters =
+    (props.selectedCategory === "All" ? 0 : 1) + (props.selectedCity === "All" ? 0 : 1);
   return (
     <section className={`filter-bar ${isBookedTrip ? "peru-filter-bar" : ""}`} aria-label="Trip filters">
-      <label className="search-field">
-        <Search size={18} aria-hidden="true" />
-        <input value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="Search places, notes, addresses" />
-      </label>
-      <div className="chip-row" aria-label="Category filters">
-        {(["All", ...categoryOptions] as Array<TripCategory | "All">).map((category) => (
-          <button key={category} className={props.selectedCategory === category ? "chip active" : "chip"} type="button" onClick={() => props.setSelectedCategory(category)}>
-            {category}
-          </button>
-        ))}
+      {/* Search and the add actions stay on one row; the rest collapses on
+          mobile, where this bar used to be ~460px of chrome before any
+          itinerary content. */}
+      <div className="filter-primary-row">
+        <label className="search-field">
+          <Search size={18} aria-hidden="true" />
+          <input value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="Search places, notes, addresses" />
+        </label>
+        <button
+          className="ghost-button filter-toggle"
+          type="button"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          <SlidersHorizontal size={17} aria-hidden="true" />
+          Filters{activeFilters ? ` (${activeFilters})` : ""}
+        </button>
+        {!isBookedTrip && (
+          <>
+            <button className="primary-button" type="button" onClick={props.addActivity}><Plus size={17} aria-hidden="true" /> Add</button>
+            <button className="ghost-button" type="button" onClick={props.addRestDay}><CalendarDays size={17} aria-hidden="true" /> Rest day</button>
+          </>
+        )}
       </div>
-      {!isBookedTrip && <div className="filter-selects">
-        <label className="field">
-          <span>City</span>
-          <select value={props.selectedCity} onChange={(event) => props.setSelectedCity(event.target.value)}>
-            {props.cities.map((city) => <option key={city}>{city}</option>)}
-          </select>
-        </label>
-        <label className="field">
-          <span>Day</span>
-          <select value={props.selectedDay} onChange={(event) => props.setSelectedDay(event.target.value === "All" ? "All" : Number(event.target.value))}>
-            {props.days.map((day) => <option key={day} value={day}>{day === "All" ? "All days" : `Day ${day}`}</option>)}
-          </select>
-        </label>
-        <button className="primary-button" type="button" onClick={props.addActivity}><Plus size={17} aria-hidden="true" /> Add</button>
-        <button className="ghost-button" type="button" onClick={props.addRestDay}><CalendarDays size={17} aria-hidden="true" /> Rest day</button>
-      </div>}
+      <div className={`filter-extra ${filtersOpen ? "open" : ""}`}>
+        <div className="chip-row" aria-label="Category filters">
+          {(["All", ...categoryOptions] as Array<TripCategory | "All">).map((category) => (
+            <button key={category} className={props.selectedCategory === category ? "chip active" : "chip"} type="button" onClick={() => props.setSelectedCategory(category)}>
+              {category}
+            </button>
+          ))}
+        </div>
+        {!isBookedTrip && (
+          <label className="field">
+            <span>City</span>
+            <select value={props.selectedCity} onChange={(event) => props.setSelectedCity(event.target.value)}>
+              {props.cities.map((city) => <option key={city}>{city}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
     </section>
   );
 }
