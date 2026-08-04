@@ -595,7 +595,7 @@ img {
 
 /* The "Filters" disclosure is mobile-only; on desktop there is room to keep
    the category chips and city select on screen. */
-.filter-toggle {
+.ghost-button.filter-toggle {
   display: none;
 }
 
@@ -604,7 +604,7 @@ img {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .filter-toggle {
+  .ghost-button.filter-toggle {
     display: inline-flex;
   }
 
@@ -840,7 +840,6 @@ img {
 
 .timeline {
   display: grid;
-  gap: var(--s-3);
 }
 
 .day-column {
@@ -1340,7 +1339,7 @@ img {
   gap: var(--s-3);
 }
 
-.compact-dashboard-grid {
+.dashboard-grid.compact-dashboard-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -1782,7 +1781,7 @@ img {
 .card-body,
 .expanded-panel,
 .logistics-stack,
-.assistant-panel,
+.content-section.assistant-panel,
 .suggestion-list,
 .maps-list {
   display: grid;
@@ -1901,7 +1900,7 @@ img {
   border-color: color-mix(in srgb, var(--amber) 22%, var(--line));
 }
 
-.import-panel,
+.content-section.import-panel,
 .source-note,
 .textarea-grid {
   display: grid;
@@ -2596,7 +2595,7 @@ img {
   text-align: center;
 }
 
-.compact-map-route-list {
+.map-route-list.compact-map-route-list {
   grid-template-columns: minmax(0, 1fr);
   gap: var(--s-1);
 }
@@ -2763,7 +2762,7 @@ img {
   display: none;
 }
 
-.itinerary-card .card-body {
+.place-card.itinerary-card .card-body {
   min-width: 0;
   align-content: start;
   padding: var(--s-05);
@@ -4014,7 +4013,7 @@ img {
   overflow: visible;
 }
 
-.compact-region-calendar {
+.overview-region-calendar.compact-region-calendar {
   gap: var(--s-2);
   padding: var(--s-3);
   box-shadow: none;
@@ -5120,6 +5119,13 @@ img {
   padding: var(--s-05) var(--s-05) var(--s-2);
 }
 
+/* NOTE: `trip-date` is used by two unrelated components - the buttons in
+   .trip-date-strip (this rule) and, in the region calendar, a modifier on
+   .region-month-day marking a day that falls inside the trip. The calendar
+   cells therefore inherit this button sizing: trip days measure 134x72 while
+   ordinary days are 54x54. Scoping this to `.trip-date-strip .trip-date`
+   would fix the collision but visibly changes the calendar, so it is left
+   as-is pending a decision on how those cells should look. */
 .trip-date {
   display: grid;
   min-width: 134px;
@@ -5527,11 +5533,11 @@ img {
   font-weight: 600;
 }
 
-.budget-hero-simple {
+.budget-hero.budget-hero-simple {
   grid-template-columns: minmax(240px, 1.25fr) repeat(2, minmax(160px, 0.8fr));
 }
 
-.total-metric strong {
+.metric-card.total-metric strong {
   font-size: var(--t-6);
   line-height: 1;
 }
@@ -5571,7 +5577,7 @@ img {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
-.compact-logistics-card {
+.logistics-card.compact-logistics-card {
   padding: 0;
   overflow: hidden;
 }
@@ -5904,7 +5910,7 @@ img {
 }
 
 /* ===== Japan: explore board ===== */
-.japan-explore {
+.content-section.japan-explore {
   gap: var(--s-3);
 }
 
