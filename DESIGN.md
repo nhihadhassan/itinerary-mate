@@ -18,16 +18,38 @@ Itinerary Mate should feel like a calm travel cockpit: structured, quick to scan
 - Accent color is for active nav, primary actions, selected filters, and key status.
 - Avoid purple/blue gradients, neon glow, pure black, and pure white.
 
+## Scale
+
+Every spacing, radius, type, and elevation value resolves to a token defined
+at the top of `src/styles.css`. Introducing a new literal is a bug: pick the
+nearest step, or change the token.
+
+| Role | Tokens |
+| --- | --- |
+| Spacing (4px base) | `--s-0` `--s-05` `--s-1` `--s-2` `--s-3` `--s-4` `--s-5` `--s-6` |
+| Radius | `--r-1` 6px, `--r-2` 10px, `--r-3` 14px, `--r-pill` |
+| Type | `--t-1` 11px … `--t-7` 36px |
+| Elevation | `--shadow-1` resting, `--shadow-2` raised, `--ring` focus |
+| Accent foreground | `--on-accent` (flips with theme) |
+
+Breakpoints are a fixed list, documented in `styles.css`. Do not invent a
+new one. The mobile shell is `max-width: 760px`; its exact complement is
+`min-width: 761px`.
+
 ## Typography
 
 - Use one high-quality sans/system stack for product clarity.
-- Fixed scale, no viewport-scaling text.
+- Fixed scale, no viewport-scaling text. No `clamp()` on headings.
 - Dense surfaces use compact headings and tabular numbers.
 - Every heading should introduce a real section, not restate body copy.
 
 ## Layout
 
 - Mobile-first.
+- One card level per screen. A section is spacing and a rule, not a card
+  around cards.
+- Chrome earns its space: on a phone, real content should start well inside
+  the first viewport.
 - Default mobile flow: trip header, nav, next action, day/map/list content.
 - Desktop flow: broad content column with optional supporting rail.
 - Keep action controls close to the thing they affect.

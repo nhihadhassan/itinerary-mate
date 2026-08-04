@@ -57,6 +57,23 @@
   --t-6: 1.75rem;   /* 28px - section title */
   --t-7: 2.25rem;   /* 36px - page title */
 
+  /* ---- Breakpoints -----------------------------------------------------
+     CSS custom properties cannot be used in media conditions, so the tier
+     list is documented here and written literally below. Use one of these;
+     do not invent a new one. This file used to carry 16 breakpoints, several
+     of them 20-60px apart and contradicting each other.
+
+       max-width:  430px   small phone
+       max-width:  520px   phone
+       max-width:  620px   large phone
+       max-width:  760px   mobile shell - the main phone/desktop split
+       max-width: 1180px   narrow desktop
+       min-width:  761px   two-column content - the exact complement of 760
+       min-width:  900px   desktop timeline
+       min-width: 1080px   side panel plus content
+       min-width: 1320px   wide desktop
+     -------------------------------------------------------------------- */
+
   /* Elevation: resting surface, raised surface. */
   --shadow-1: 0 1px 2px rgba(31, 47, 42, 0.05);
   --ring: 0 0 0 3px color-mix(in srgb, var(--trip-accent) 22%, transparent);
@@ -375,7 +392,7 @@ img {
 @media (max-width: 760px) {
   .nav-tabs {
     grid-auto-flow: row;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
     margin-bottom: var(--s-3);
   }
 }
@@ -1177,13 +1194,16 @@ img {
   border: 0;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 761px) {
   .app-shell {
     padding: var(--s-5);
   }
 
+  /* The title and the action cluster only fit side by side once there is
+     real room; below that the title column collapses to a few characters
+     per line. Two-column starts at 900px, not here. */
   .topbar {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .hero-panel {
@@ -1217,7 +1237,7 @@ img {
   }
 }
 
-@media (min-width: 1040px) {
+@media (min-width: 1080px) {
   .app-shell {
     padding: var(--s-5);
   }
@@ -1307,7 +1327,7 @@ img {
   }
 }
 
-/* Multi-trip Itinerary Mate additions */
+/* ===== Trip shell, switcher, and shared surfaces ===== */
 .dashboard-grid,
 .budget-hero,
 .overview-grid,
@@ -2093,6 +2113,10 @@ img {
 }
 
 @media (min-width: 900px) {
+  .topbar {
+    grid-template-columns: 1fr auto;
+  }
+
   .wanderlog-timeline .place-card {
     grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
     align-items: stretch;
@@ -2144,7 +2168,7 @@ img {
   }
 }
 
-/* Wanderlog-inspired route-first redesign */
+/* ===== Route and timeline ===== */
 /* A page section is a grouping, not an object. Per DESIGN.md it is spacing
    and a rule, not another card around the cards it contains - that nesting
    was what made every screen read as card soup. */
@@ -2262,7 +2286,10 @@ img {
   display: none;
 }
 
-.itinerary-main-grid {
+/* Qualified with .main-grid so it outranks the plain `.main-grid` column
+   rules in the wide-viewport media queries instead of racing them on source
+   order. This layout has no side panel, so it must win wherever it applies. */
+.main-grid.itinerary-main-grid {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -2825,7 +2852,7 @@ img {
   color: color-mix(in srgb, var(--ink) 80%, var(--trip-accent));
 }
 
-@media (min-width: 720px) {
+@media (min-width: 761px) {
   .budget-controls {
     grid-template-columns: minmax(260px, 1fr) 220px;
     align-items: center;
@@ -2934,7 +2961,7 @@ img {
   }
 }
 
-/* Portugal actual-trip record */
+/* ===== Portugal: completed-trip record ===== */
 .trip-mode-bar {
   display: flex;
   width: min(100% - 32px, 1384px);
@@ -3753,7 +3780,7 @@ img {
   font-weight: 800;
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1180px) {
   .actual-overview-grid,
   .actual-review-row,
   .actual-itinerary-layout,
@@ -3773,7 +3800,7 @@ img {
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .trip-mode-bar,
   .actual-hero,
   .actual-section-header,
@@ -3896,7 +3923,7 @@ img {
   }
 }
 
-/* Peru simplification pass: keep the imported trip useful, but far quieter. */
+/* ===== Peru: imported trip ===== */
 .trip-peru .quick-card,
 .trip-portugal .quick-card {
   gap: var(--s-1);
@@ -4488,7 +4515,7 @@ img {
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .easy-overview-map-toolbar {
     flex-wrap: wrap;
   }
@@ -4943,7 +4970,7 @@ img {
   margin-top: 0;
 }
 
-@media (min-width: 920px) {
+@media (min-width: 900px) {
   .booked-overview-hero {
     grid-template-columns: minmax(420px, 1fr) minmax(340px, 0.72fr);
     grid-template-areas:
@@ -4986,7 +5013,7 @@ img {
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .booked-dashboard-grid .peru-dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5011,7 +5038,7 @@ img {
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 430px) {
   .booked-dashboard-grid .peru-dashboard-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -5046,7 +5073,7 @@ img {
   display: none;
 }
 
-/* Peru calendar */
+/* ===== Peru: calendar ===== */
 .trip-calendar {
   gap: var(--s-3);
 }
@@ -5412,7 +5439,7 @@ img {
   }
 }
 
-/* Focused cleanup pass: quieter controls, consistent trip cards, stable sticky bars. */
+/* ===== Controls and trip cards ===== */
 .day-rail,
 .trip-peru .day-rail,
 .trip-portugal .day-rail {
@@ -5647,7 +5674,7 @@ img {
   }
 }
 
-/* Dark mode readability pass */
+/* ===== Dark theme overrides ===== */
 :root[data-theme="dark"] {
   --ink: #f4f8f2;
   --muted: #c3d0c8;
@@ -5867,7 +5894,7 @@ img {
   border-color: var(--line);
 }
 
-/* Japan Explore research board */
+/* ===== Japan: explore board ===== */
 .japan-explore {
   gap: var(--s-3);
 }
@@ -6195,7 +6222,7 @@ img {
   color: #10201a;
 }
 
-/* Discovery travel research board */
+/* ===== Discovery board ===== */
 .discovery-board {
   gap: var(--s-3);
 }
@@ -6527,7 +6554,7 @@ img {
   }
 }
 
-/* Impeccable polish pass */
+/* ===== Scroll, focus, and surface polish ===== */
 html {
   scroll-padding-top: 168px;
 }
@@ -6796,7 +6823,7 @@ button:not(:disabled):active,
   }
 }
 
-/* Compact mobile shell: keep the first viewport focused on the trip itself. */
+/* ===== Mobile shell ===== */
 @media (max-width: 760px) {
   html {
     scroll-padding-top: 72px;
@@ -6921,7 +6948,7 @@ button:not(:disabled):active,
   }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 430px) {
   .trip-switcher button {
     font-size: var(--t-1);
   }
@@ -6933,7 +6960,7 @@ button:not(:disabled):active,
   }
 }
 
-/* Refresh motion layer: stateful, restrained, and transform-only. */
+/* ===== Motion ===== */
 :root {
   --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
