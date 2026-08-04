@@ -5505,6 +5505,15 @@ img {
   font-weight: 750;
 }
 
+/* The cost category qualifies the amount, so it reads as a quieter suffix
+   rather than sharing the amount's weight behind a pipe. */
+.cost-chip em {
+  color: var(--muted);
+  font-size: var(--t-2);
+  font-style: normal;
+  font-weight: 600;
+}
+
 .cost-chip small,
 .budget-row strong small,
 .metric-card strong + span:empty {

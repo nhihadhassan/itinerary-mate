@@ -479,11 +479,17 @@ function getCurrencyLabel(trip: Trip) {
   return trip.currencyConfig?.label || `${trip.currency} per 1 CAD`;
 }
 
-function getCostLabel(activity: TripActivity, exchangeRate: number) {
+/** The amount is the fact; the category qualifies it. Kept as separate parts
+ *  so the amount can carry the emphasis on its own. */
+function getCostParts(activity: TripActivity, exchangeRate: number) {
   const cost = activity.costLocal ?? activity.estimatedCost;
-  if (!cost) return "Add cost";
-  const currency = activity.localCurrencyCode || activity.currency;
-  return `${formatCadOnly(cost, exchangeRate)}${activity.costCategory ? ` | ${activity.costCategory}` : ""}`;
+  if (!cost) return { amount: "Add cost", category: "" };
+  return { amount: formatCadOnly(cost, exchangeRate), category: activity.costCategory || "" };
+}
+
+function getCostLabel(activity: TripActivity, exchangeRate: number) {
+  const { amount, category } = getCostParts(activity, exchangeRate);
+  return category ? `${amount} · ${category}` : amount;
 }
 
 function getLocalCostSubtext(value: number, currency: string) {
@@ -3662,6 +3668,7 @@ function ActivityCard({
   const imageLoaded = loadedImageIds.has(activity.id);
   const needsConfirmation = Boolean(activity.needsConfirmationReasons?.length || activity.costStatus === "needs-confirmation" || activity.bookingStatus === "needs-confirmation");
   const localCostSubtext = getLocalCostSubtext(activity.costLocal ?? activity.estimatedCost, activity.localCurrencyCode || activity.currency);
+  const cost = getCostParts(activity, exchangeRate);
   return (
     <article className={`place-card ${variant === "compact" ? "itinerary-card" : ""} ${hasImage ? "has-real-image" : "no-real-image"} type-${activity.type || "activity"}${activity.isCompleted ? " completed" : ""}`} ref={setNodeRef} style={style}>
       {stopNumber && <span className="pin-badge" aria-label={`Stop ${stopNumber}`}>{stopNumber}</span>}
@@ -3711,7 +3718,8 @@ function ActivityCard({
         <div className="meta-chips">
           <span className="cost-chip">
             <CircleDollarSign size={14} />
-            <b>{getCostLabel(activity, exchangeRate)}</b>
+            <b>{cost.amount}</b>
+            {cost.category && <em>{cost.category}</em>}
             {localCostSubtext && <small>{localCostSubtext}</small>}
           </span>
           <span><MapPin size={14} /> {routeTimeLabel(activity) || "Add travel time"}</span>
@@ -3956,7 +3964,10 @@ function TripMapPanel({
           <p className="eyebrow">Open map</p>
           <h2>{dayLabel}</h2>
         </div>
-        <span>{stops.length} pins</span>
+        {/* Count what can actually be pinned, not every stop. Reporting
+            "14 pins" above "Add coordinates to show this day on the map"
+            told the traveller two contradictory things. */}
+        <span>{hasCoordinates ? `${coordinateStops.length} of ${stops.length} mapped` : `${stops.length} stops, none mapped`}</span>
       </div>
       <form className="map-search" onSubmit={runMapSearch}>
         <label>
@@ -4034,8 +4045,13 @@ function TripDayMapStack({ trip, activities }: { trip: Trip; activities: TripAct
     acc[activity.day].push(activity);
     return acc;
   }, {});
+  // Only stops with coordinates can be drawn, so a day qualifies for its own
+  // map on that basis - otherwise a day card claimed pins it could not plot.
   const mappedDays = Object.entries(dayGroups)
-    .map(([day, stops]) => ({ day: Number(day), stops: stops.slice(0, 8) }))
+    .map(([day, stops]) => ({
+      day: Number(day),
+      stops: stops.filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined).slice(0, 8),
+    }))
     .filter(({ stops }) => stops.length >= 2)
     .sort((a, b) => a.day - b.day);
 
