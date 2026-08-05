@@ -5119,14 +5119,13 @@ img {
   padding: var(--s-05) var(--s-05) var(--s-2);
 }
 
-/* NOTE: `trip-date` is used by two unrelated components - the buttons in
-   .trip-date-strip (this rule) and, in the region calendar, a modifier on
-   .region-month-day marking a day that falls inside the trip. The calendar
-   cells therefore inherit this button sizing: trip days measure 134x72 while
-   ordinary days are 54x54. Scoping this to `.trip-date-strip .trip-date`
-   would fix the collision but visibly changes the calendar, so it is left
-   as-is pending a decision on how those cells should look. */
-.trip-date {
+/* `trip-date` names two unrelated things: these date-strip buttons, and a
+   modifier on .region-month-day marking a calendar day inside the trip.
+   Unscoped, this button sizing leaked into the calendar and blew those cells
+   up to 134x72 inside 50px grid tracks, overlapping their neighbours and
+   pushing five of them outside the calendar. Scoped to the strip, the
+   calendar keeps its own .region-month-day.trip-date colouring. */
+.trip-date-strip .trip-date {
   display: grid;
   min-width: 134px;
   min-height: 72px;
@@ -5139,24 +5138,24 @@ img {
   text-align: left;
 }
 
-.trip-date span,
-.trip-date small {
+.trip-date-strip .trip-date span,
+.trip-date-strip .trip-date small {
   color: var(--muted);
   font-size: var(--t-2);
 }
 
-.trip-date strong {
+.trip-date-strip .trip-date strong {
   font-size: var(--t-3);
 }
 
-.trip-date.active {
+.trip-date-strip .trip-date.active {
   border-color: var(--ink);
   background: var(--ink);
   color: var(--surface-strong);
 }
 
-.trip-date.active span,
-.trip-date.active small {
+.trip-date-strip .trip-date.active span,
+.trip-date-strip .trip-date.active small {
   color: rgba(255, 253, 248, 0.72);
 }
 
@@ -6183,20 +6182,20 @@ img {
 :root[data-theme="dark"] .calendar-hero,
 :root[data-theme="dark"] .month-card,
 :root[data-theme="dark"] .agenda-card,
-:root[data-theme="dark"] .trip-date {
+:root[data-theme="dark"] .trip-date-strip .trip-date {
   border-color: var(--line);
   background: #17231f;
   box-shadow: var(--shadow-2);
 }
 
-:root[data-theme="dark"] .trip-date.active {
+:root[data-theme="dark"] .trip-date-strip .trip-date.active {
   border-color: #edf5ea;
   background: #edf5ea;
   color: #10201a;
 }
 
-:root[data-theme="dark"] .trip-date.active span,
-:root[data-theme="dark"] .trip-date.active small {
+:root[data-theme="dark"] .trip-date-strip .trip-date.active span,
+:root[data-theme="dark"] .trip-date-strip .trip-date.active small {
   color: #486059;
 }
 
