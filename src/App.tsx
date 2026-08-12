@@ -743,6 +743,19 @@ function App() {
     });
   }
 
+  function markActualVisitsVisited(ids: string[]) {
+    if (!activeTrip.actuals || !ids.length) return;
+    const idSet = new Set(ids);
+    updateActiveTrip({
+      actuals: {
+        ...activeTrip.actuals,
+        visits: activeTrip.actuals.visits.map((visit) =>
+          idSet.has(visit.id) ? { ...visit, status: "visited", evidence: "manual" } : visit,
+        ),
+      },
+    });
+  }
+
   function openView(view: AppView) {
     setActiveView(view);
     if (view === "itinerary") setSelectedDay("All");
@@ -1236,7 +1249,7 @@ function App() {
           )}
 
           {activeView === "itinerary" && isPortugalActual && activeTrip.actuals && (
-            <ActualTripItinerary trip={activeTrip} updateVisit={updateActualVisit} />
+            <ActualTripItinerary trip={activeTrip} updateVisit={updateActualVisit} markVisited={markActualVisitsVisited} />
           )}
 
           {activeView === "itinerary" && !isPortugalActual && (
@@ -1528,19 +1541,36 @@ function ActualTripOverview({ trip, updateVisit }: { trip: Trip; updateVisit: (i
   );
 }
 
-function ActualTripItinerary({ trip, updateVisit }: { trip: Trip; updateVisit: (id: string, patch: Partial<ActualVisit>) => void }) {
+function BulkVisitButton({ pendingIds, markVisited, confirmLabel, doneLabel, ariaLabel }: { pendingIds: string[]; markVisited: (ids: string[]) => void; confirmLabel: string; doneLabel: string; ariaLabel: string }) {
+  return (
+    <button type="button" className="ghost-button bulk-visit-button" onClick={() => markVisited(pendingIds)} disabled={!pendingIds.length} aria-label={ariaLabel}>
+      <CheckCircle2 size={15} aria-hidden="true" /> {pendingIds.length ? confirmLabel : doneLabel}
+    </button>
+  );
+}
+
+function ActualTripItinerary({ trip, updateVisit, markVisited }: { trip: Trip; updateVisit: (id: string, patch: Partial<ActualVisit>) => void; markVisited: (ids: string[]) => void }) {
   const actuals = trip.actuals!;
+  // Bulk confirm only touches unconfirmed stops; an explicit "Skipped" is a decision to preserve.
+  const tripPendingIds = actuals.visits.filter((visit) => visit.status === "unconfirmed").map((visit) => visit.id);
   return (
     <section className="actual-itinerary-layout">
       <div className="actual-day-ledger">
-        <header className="actual-section-header"><div><p className="eyebrow">Evidence-based timeline</p><h2>The trip, day by day</h2></div><span>{actuals.visits.filter((visit) => visit.status === "visited").length} confirmed places</span></header>
+        <header className="actual-section-header">
+          <div><p className="eyebrow">Evidence-based timeline</p><h2>The trip, day by day</h2></div>
+          <div className="actual-header-actions">
+            <span>{actuals.visits.filter((visit) => visit.status === "visited").length} confirmed places</span>
+            <BulkVisitButton pendingIds={tripPendingIds} markVisited={markVisited} confirmLabel="Confirm all visited" doneLabel="All confirmed" ariaLabel="Confirm every unconfirmed place as visited" />
+          </div>
+        </header>
         {actuals.journalDays.map((day) => {
           const visits = actuals.visits.filter((visit) => day.visitIds.includes(visit.id));
+          const dayPendingIds = visits.filter((visit) => visit.status === "unconfirmed").map((visit) => visit.id);
           const expenses = actuals.expenses.filter((expense) => expense.date === day.date);
           const dayTotal = expenses.reduce((sum, expense) => sum + expense.cadEquivalent, 0);
           return (
             <article className="actual-day-card" key={day.id} id={"actual-day-" + day.day}>
-              <header><div><p className="eyebrow">Day {day.day} · {formatDate(day.date)}</p><h3>{day.title}</h3><p>{day.summary}</p></div><strong>{cadLabel(dayTotal)}<small>{expenses.length} expenses</small></strong></header>
+              <header><div><p className="eyebrow">Day {day.day} · {formatDate(day.date)}</p><h3>{day.title}</h3><p>{day.summary}</p></div><div className="actual-day-header-side"><strong>{cadLabel(dayTotal)}<small>{expenses.length} expenses</small></strong>{visits.length > 0 && <BulkVisitButton pendingIds={dayPendingIds} markVisited={markVisited} confirmLabel="Confirm day visited" doneLabel="Day confirmed" ariaLabel={"Confirm Day " + day.day + " places as visited"} />}</div></header>
               <div className="actual-visit-list">
                 {visits.map((visit) => {
                   const linked = expensesForVisit(actuals.expenses, visit);
