@@ -3,7 +3,7 @@ import type { RouteSuggestion, Trip, TripActivity, TripAttachment, TripFlight, T
 export const PERU_CAD_TO_PEN = 2.5;
 export const PERU_WANDERLOG_URL = "https://wanderlog.com/plan/ovvfbwnqqrtasylt/trip-to-peru";
 export const PERU_GOOGLE_DOC_URL = "https://docs.google.com/document/d/1huAZVsFsUmAh80jzrkG6IzBke6sNUKhoJp3wjIOjJfI/edit?tab=t.ydmxzx6uluaw";
-export const PERU_WANDERLOG_PDF_SOURCE = "/Users/nhihad/Downloads/Trip to Peru – Wanderlog.pdf";
+export const PERU_WANDERLOG_PDF_SOURCE = "~/Downloads/Trip to Peru – Wanderlog.pdf";
 
 const scenic = (name: string) =>
   `linear-gradient(135deg, hsl(${Math.abs([...name].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % 360} 48% 86%) 0%, #f7efe0 52%, #dceee7 100%)`;
@@ -3556,7 +3556,7 @@ export const peruAttachments: TripAttachment[] = [
     "fileName": "Trip to Peru – Wanderlog.pdf",
     "type": "pdf",
     "note": "Local PDF source used for exact daily route summaries, route-leg timings, opening-hour notes, flights, hotels, transit, and expenses.",
-    "localReference": "/Users/nhihad/Downloads/Trip to Peru – Wanderlog.pdf",
+    "localReference": "~/Downloads/Trip to Peru – Wanderlog.pdf",
     "isSensitivePlaceholder": false
   },
   {
@@ -3621,5 +3621,5 @@ export const peruTrip: Trip = {
   flights: peruFlights,
   hotels: peruHotels,
   attachments: peruAttachments,
-  notes: "Detailed Wanderlog PDF imported from /Users/nhihad/Downloads/Trip to Peru – Wanderlog.pdf.\n\nhttps://docs.google.com/document/d/1huAZVsFsUmAh80jzrkG6IzBke6sNUKhoJp3wjIOjJfI/edit?tab=t.ydmxzx6uluaw\n\nneed to book flights and drivers",
+  notes: "Detailed Wanderlog PDF imported from ~/Downloads/Trip to Peru – Wanderlog.pdf.\n\nhttps://docs.google.com/document/d/1huAZVsFsUmAh80jzrkG6IzBke6sNUKhoJp3wjIOjJfI/edit?tab=t.ydmxzx6uluaw\n\nneed to book flights and drivers",
 };

@@ -4,7 +4,7 @@ Source downloaded for reference:
 
 - Site: https://dobidop.github.io/easyItinerary/
 - Repo: https://github.com/Dobidop/easyItinerary
-- Local reference copy: `/Users/nhihad/Documents/easyItinerary-reference`
+- Local reference copy: `~/reference/easyItinerary-reference`
 - License: MIT, copyright Dobidop 2026
 
 The reference app is a vanilla HTML/CSS/JavaScript itinerary planner. It should not be copied wholesale into Itinerary Mate because our app is Vite + React + TypeScript, but several functions and interaction patterns are useful to adapt.
