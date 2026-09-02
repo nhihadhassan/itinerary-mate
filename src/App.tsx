@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
-import L from "leaflet";
+import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { Link } from "react-router-dom";
 import {
   DndContext,
   DragEndEvent,
@@ -59,17 +60,22 @@ import {
 import { peruDayRouteSummaries, peruRouteSuggestions, peruTrip } from "./peruItinerary";
 import { portugalDayRouteSummaries, portugalRegionCalendar, portugalRouteSuggestions, portugalTrip } from "./portugalItinerary";
 import { portugalActualMarkdown } from "./portugalActualTrip";
-import { japanExploreKinds, japanExplorePlaces } from "./japanExplore";
 import type { JapanExploreKind, JapanExplorePlace } from "./japanExplore";
-import { discoveryKinds, discoveryPlaces, discoveryWindows } from "./discoveryPlaces";
 import type { DiscoveryKind, DiscoveryPlace, DiscoveryWindow } from "./discoveryPlaces";
 import { searchOpenPlaces } from "./lib/openMapServices";
 import type { OpenPlaceSearchResult } from "./lib/openMapServices";
 import type { ActualExpense, ActualVisit, RouteSuggestion, Trip, TripActivity, TripAttachment, TripCategory, TripFlight, TripHotel, TripId, TripJournalDay } from "./tripTypes";
+import type { AppRouteDefinition, RouteMode, RouteView } from "./routeManifest";
+import { appRoutes } from "./routeManifest";
 
-type AppView = "dashboard" | "itinerary" | "calendar" | "places" | "discovery" | "journal" | "budget" | "maps" | "more";
+type AppView = RouteView;
 type ThemePreference = "light" | "dark";
 type PortugalMode = "plan" | "actual";
+
+interface AppProps {
+  route?: AppRouteDefinition;
+  navigate?: (path: string) => void;
+}
 
 interface LegacyJapanState {
   version: 1;
@@ -103,6 +109,7 @@ const PORTUGAL_MODE_STORAGE_KEY = "itinerary-mate-portugal-mode-v1";
 const tripOrder: TripId[] = ["japan-2026", "peru-2026", "portugal-2026"];
 const calendarTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
 const bookedTripIds = new Set<TripId>(["peru-2026", "portugal-2026"]);
+const LazyMorePanel = lazy(() => import("./MorePanel"));
 
 const baseNavItems: Array<{ id: AppView; label: string }> = [
   { id: "dashboard", label: "Today" },
@@ -192,7 +199,7 @@ function hydrateJapanActivities(activities: Activity[]) {
     return {
       ...activity,
       imageUrl: activity.imageUrl || fallback?.imageUrl || "",
-      imageAlt: activity.imageAlt || fallback?.imageAlt || `Image-style placeholder for ${activity.title}.`,
+      imageAlt: activity.imageAlt || fallback?.imageAlt || `Destination visual for ${activity.title}.`,
       imageCredit: activity.imageCredit || fallback?.imageCredit,
       imageCreditUrl: activity.imageCreditUrl || fallback?.imageCreditUrl,
       imageLicense: activity.imageLicense || fallback?.imageLicense,
@@ -293,7 +300,7 @@ function buildJapanTrip(activities = defaultActivities, stayAreas = defaultStayA
         departureTime: "2026-09-01T00:00:00",
         arrivalTime: "2026-09-01T00:00:00",
         status: "pending",
-        notes: "Manual placeholder. Add real flight details when booked.",
+        notes: "Flight details are not booked yet. Add them when confirmed.",
       },
     ],
     hotels: stayAreas.map(japanStayToHotel),
@@ -301,9 +308,9 @@ function buildJapanTrip(activities = defaultActivities, stayAreas = defaultStayA
       {
         id: "japan-rail-bookings-placeholder",
         tripId: "japan-2026",
-        fileName: "rail-and-hotel-bookings-placeholder.pdf",
+        fileName: "rail-and-hotel-bookings-reference.pdf",
         type: "booking",
-        note: "Local-only metadata placeholder for rail passes, hotels, and tickets.",
+        note: "Local-only booking reference metadata for rail passes, hotels, and tickets.",
         isSensitivePlaceholder: true,
       },
     ],
@@ -620,20 +627,22 @@ function visibleActivities(trip: Trip, branch: TripBranch) {
   return trip.activities.filter((activity) => !activity.branch || activity.branch === branch);
 }
 
-function App() {
+function App({ route, navigate }: AppProps) {
   const initial = useMemo(loadState, []);
   const [state, setState] = useState<MultiTripState>(initial);
-  const [activeView, setActiveView] = useState<AppView>("dashboard");
   const [selectedCategory, setSelectedCategory] = useState<TripCategory | "All">("All");
   const [selectedCity, setSelectedCity] = useState("All");
   const [selectedDay, setSelectedDay] = useState<number | "All">("All");
   const [query, setQuery] = useState("");
+  const [activeView, setActiveView] = useState<AppView>(route?.view || "dashboard");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState("Saved locally");
   const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(() => new Set());
   const [loadedImageIds, setLoadedImageIds] = useState<Set<string>>(() => new Set());
+  const [japanExploreData, setJapanExploreData] = useState<{ kinds: Array<JapanExploreKind | "All">; places: JapanExplorePlace[] } | null>(null);
+  const [discoveryData, setDiscoveryData] = useState<{ kinds: Array<DiscoveryKind | "All">; windows: Array<DiscoveryWindow | "All">; places: DiscoveryPlace[] } | null>(null);
   const [updateReady, setUpdateReady] = useState(false);
-  const [portugalMode, setPortugalMode] = useState<PortugalMode>(() => parseStored<PortugalMode>(PORTUGAL_MODE_STORAGE_KEY) || "actual");
+  const [portugalMode, setPortugalMode] = useState<PortugalMode>(() => route?.mode || parseStored<PortugalMode>(PORTUGAL_MODE_STORAGE_KEY) || "actual");
   const [checklists, setChecklists] = useState<Record<TripId, ChecklistItem[]>>(() => parseStored<Record<TripId, ChecklistItem[]>>(CHECKLIST_STORAGE_KEY) || makeDefaultChecklistState());
 
   const sensors = useSensors(
@@ -641,8 +650,10 @@ function App() {
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
   );
 
-  const activeTrip = state.trips[state.activeTripId];
-  const isPortugalActual = activeTrip.id === "portugal-2026" && portugalMode === "actual" && Boolean(activeTrip.actuals);
+  const routedTripId = route?.tripId || state.activeTripId;
+  const activeTrip = state.trips[routedTripId];
+  const effectivePortugalMode = route?.mode || portugalMode;
+  const isPortugalActual = activeTrip.id === "portugal-2026" && effectivePortugalMode === "actual" && Boolean(activeTrip.actuals);
   const activeNavItems = useMemo(
     () => {
       if (isPortugalActual) {
@@ -702,6 +713,20 @@ function App() {
   const routeSuggestions = useMemo(() => makeRouteSuggestions(activeTrip, allVisibleActivities), [activeTrip, allVisibleActivities]);
   const resolvedTheme = state.themePreference;
   const activeExchangeRate = getExchangeRate(activeTrip, state.japanCadToJpy);
+  const pageHeading = activeView === "discovery"
+    ? "Explore travel ideas"
+    : activeView === "dashboard"
+      ? activeTrip.title
+      : `${activeTrip.title} ${activeView === "maps" ? "map export" : activeView === "more" ? "trip tools" : activeView}`;
+
+  useEffect(() => {
+    if (!route) return;
+    setActiveView(route.view);
+    if (route.mode) setPortugalMode(route.mode);
+    if (route.tripId && state.activeTripId !== route.tripId) {
+      setState((current) => ({ ...current, activeTripId: route.tripId! }));
+    }
+  }, [route?.path]);
 
   useEffect(() => {
     const onUpdateReady = () => setUpdateReady(true);
@@ -719,8 +744,7 @@ function App() {
     setSelectedCity("All");
     setQuery("");
     setExpandedId(null);
-    setActiveView("dashboard");
-  }, [state.activeTripId]);
+  }, [routedTripId]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -741,6 +765,16 @@ function App() {
     localStorage.setItem(PORTUGAL_MODE_STORAGE_KEY, JSON.stringify(portugalMode));
   }, [portugalMode]);
 
+  function pathForView(view: AppView, tripId = activeTrip.id, mode: RouteMode = effectivePortugalMode) {
+    const target = appRoutes.find((candidate) => candidate.tripId === tripId && candidate.view === view && candidate.mode === mode)
+      || appRoutes.find((candidate) => candidate.tripId === tripId && candidate.view === view && !candidate.mode);
+    return target?.path || (tripId === "japan-2026" && view === "dashboard" ? "/" : `/trips/${tripId}/${view}`);
+  }
+
+  function navigateTo(path: string) {
+    navigate?.(path);
+  }
+
   function updateState(patch: Partial<MultiTripState>) {
     setState((current) => ({ ...current, ...patch }));
   }
@@ -750,8 +784,8 @@ function App() {
       ...current,
       trips: {
         ...current.trips,
-        [current.activeTripId]: {
-          ...current.trips[current.activeTripId],
+        [routedTripId]: {
+          ...current.trips[routedTripId],
           ...patch,
         },
       },
@@ -784,6 +818,7 @@ function App() {
   function openView(view: AppView) {
     setActiveView(view);
     if (view === "itinerary") setSelectedDay("All");
+    navigateTo(view === "discovery" ? "/explore" : pathForView(view));
   }
 
   function jumpToItineraryDay(day: number) {
@@ -937,7 +972,7 @@ function App() {
     updateActiveTrip({ activities: [newActivity, ...activeTrip.activities] });
     setExpandedId(id);
     setSelectedDay(newActivity.day);
-    setActiveView(nextView);
+    openView(nextView);
     setSaveStatus(`Added ${newActivity.title}`);
   }
 
@@ -988,7 +1023,7 @@ function App() {
     updateActiveTrip({ activities: [newActivity, ...activeTrip.activities] });
     setExpandedId(id);
     setSelectedDay(day);
-    setActiveView("itinerary");
+    openView("itinerary");
     setSaveStatus(`Added ${place.title} to Day ${day}`);
   }
 
@@ -1032,7 +1067,7 @@ function App() {
       attachmentIds: [],
       notes: `Source: OpenStreetMap/Photon search. OSM type: ${[place.osmClass, place.osmType].filter(Boolean).join(" / ") || "unknown"}.`,
       imageUrl: placeholderFor(place.name),
-      imageAlt: `Map search placeholder for ${place.name}.`,
+      imageAlt: `Map search visual for ${place.name}.`,
       priority: 3,
       isBooked: false,
       isCompleted: false,
@@ -1041,7 +1076,7 @@ function App() {
     updateActiveTrip({ activities: [newActivity, ...activeTrip.activities] });
     setExpandedId(id);
     setSelectedDay(targetDay);
-    setActiveView("itinerary");
+    openView("itinerary");
     setSaveStatus(`Added ${place.name} to Day ${targetDay}`);
   }
 
@@ -1081,7 +1116,7 @@ function App() {
           attachmentIds: [],
           notes: "",
           imageUrl: placeholderFor("Rest day"),
-          imageAlt: "Calm placeholder for a rest day.",
+          imageAlt: "Calm visual for a rest day.",
           priority: 4,
           isBooked: false,
           isCompleted: false,
@@ -1125,25 +1160,40 @@ function App() {
   const isTripCalendarView = calendarTripIds.has(activeTrip.id) && activeView === "calendar";
   const isDiscoveryView = activeView === "discovery";
 
+  useEffect(() => {
+    let cancelled = false;
+    if (isJapanExploreView && !japanExploreData) {
+      import("./japanExplore").then((module) => {
+        if (!cancelled) setJapanExploreData({ kinds: module.japanExploreKinds, places: module.japanExplorePlaces });
+      });
+    }
+    if (isDiscoveryView && !discoveryData) {
+      import("./discoveryPlaces").then((module) => {
+        if (!cancelled) setDiscoveryData({ kinds: module.discoveryKinds, windows: module.discoveryWindows, places: module.discoveryPlaces });
+      });
+    }
+    return () => { cancelled = true; };
+  }, [discoveryData, isDiscoveryView, isJapanExploreView, japanExploreData]);
+
   return (
     <div className={`app-shell trip-${activeTrip.id === "peru-2026" ? "peru" : activeTrip.id === "portugal-2026" ? "portugal" : "japan"}`}>
       <header className="topbar">
         <a className="skip-link" href="#main-content">Skip to itinerary</a>
         <div className="brand-block">
           <p className="eyebrow">Itinerary Mate</p>
-          <h1>{activeTrip.title}</h1>
-          <p>{[formatDate(activeTrip.startDate), formatDate(activeTrip.endDate)].filter(Boolean).join(" to ")} · {allVisibleActivities.length} stops</p>
+          <h1>{pageHeading}</h1>
+          <p>{activeView === "discovery" ? "Research ideas for future trips" : `${[formatDate(activeTrip.startDate), formatDate(activeTrip.endDate)].filter(Boolean).join(" to ")} · ${allVisibleActivities.length} stops`}</p>
         </div>
         <div className="topbar-actions">
           <TripSwitcher
-            activeTripId={state.activeTripId}
+            activeTripId={routedTripId}
             activeView={activeView}
             setActiveTripId={(activeTripId) => {
               updateState({ activeTripId });
               setSelectedDay("All");
-              setActiveView("dashboard");
+              navigateTo(pathForView("dashboard", activeTripId, activeTripId === "portugal-2026" ? "actual" : undefined));
             }}
-            openDiscovery={() => setActiveView("discovery")}
+            openDiscovery={() => navigateTo("/explore")}
           />
           <ThemeToggle preference={state.themePreference} resolvedTheme={resolvedTheme} setPreference={(themePreference) => updateState({ themePreference })} />
           {updateReady && (
@@ -1160,17 +1210,18 @@ function App() {
 
       <nav className="nav-tabs" aria-label="Planner sections">
         {activeNavItems.map((item) => (
-          <button
+          <Link
             key={item.id}
-            type="button"
+            to={pathForView(item.id)}
             className={activeView === item.id ? "active" : ""}
+            aria-current={activeView === item.id ? "page" : undefined}
             /* On narrow screens the tab strip scrolls, and the active tab
                could sit off-screen or clipped mid-word. Keep it in view. */
             ref={activeView === item.id ? scrollActiveIntoView : undefined}
-            onClick={() => openView(item.id)}
+            onClick={() => { if (item.id === "itinerary") setSelectedDay("All"); }}
           >
             {item.label}
-          </button>
+          </Link>
         ))}
       </nav>
 
@@ -1178,11 +1229,11 @@ function App() {
         <div className="trip-mode-bar" aria-label="Portugal trip mode">
           <div>
             <span>Portugal record</span>
-            <strong>{portugalMode === "actual" ? "Actual trip" : "Original plan"}</strong>
+            <strong>{effectivePortugalMode === "actual" ? "Actual trip" : "Original plan"}</strong>
           </div>
           <div className="segmented-control" role="group" aria-label="Choose planned or actual trip">
-            <button type="button" className={portugalMode === "plan" ? "active" : ""} onClick={() => { setPortugalMode("plan"); if (activeView === "journal") setActiveView("dashboard"); }}>Plan</button>
-            <button type="button" className={portugalMode === "actual" ? "active" : ""} onClick={() => { setPortugalMode("actual"); if (activeView === "calendar") setActiveView("dashboard"); }}>Actual</button>
+            <button type="button" className={effectivePortugalMode === "plan" ? "active" : ""} onClick={() => { setPortugalMode("plan"); navigateTo(pathForView(activeView === "journal" ? "dashboard" : activeView, activeTrip.id, "plan")); }}>Plan</button>
+            <button type="button" className={effectivePortugalMode === "actual" ? "active" : ""} onClick={() => { setPortugalMode("actual"); navigateTo(pathForView(activeView === "calendar" ? "dashboard" : activeView, activeTrip.id, "actual")); }}>Actual</button>
           </div>
         </div>
       )}
@@ -1326,7 +1377,7 @@ function App() {
               exchangeRate={activeExchangeRate}
               openItineraryDay={(day) => {
                 setSelectedDay("All");
-                setActiveView("itinerary");
+                openView("itinerary");
                 window.requestAnimationFrame(() => {
                   document.getElementById(`itinerary-day-${day}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
                 });
@@ -1340,17 +1391,18 @@ function App() {
 
           {activeView === "places" && !isPortugalActual && (
             activeTrip.id === "japan-2026" ? (
-              <JapanExploreBoard
-                places={japanExplorePlaces}
-                days={days}
-                addPlaceToItinerary={addJapanExplorePlace}
-                brokenImageIds={brokenImageIds}
-                setBrokenImageIds={setBrokenImageIds}
-                loadedImageIds={loadedImageIds}
-                setLoadedImageIds={setLoadedImageIds}
-                exchangeRate={activeExchangeRate}
-                setSaveStatus={setSaveStatus}
-              />
+              japanExploreData ? <JapanExploreBoard
+                  places={japanExploreData.places}
+                  kinds={japanExploreData.kinds}
+                  days={days}
+                  addPlaceToItinerary={addJapanExplorePlace}
+                  brokenImageIds={brokenImageIds}
+                  setBrokenImageIds={setBrokenImageIds}
+                  loadedImageIds={loadedImageIds}
+                  setLoadedImageIds={setLoadedImageIds}
+                  exchangeRate={activeExchangeRate}
+                  setSaveStatus={setSaveStatus}
+                /> : <LoadingState label="Loading Japan places" />
             ) : (
               <PlaceBrowser
                 activities={placeBrowserActivities}
@@ -1369,14 +1421,16 @@ function App() {
           )}
 
           {activeView === "discovery" && (
-            <DiscoveryBoard
-              places={discoveryPlaces}
-              brokenImageIds={brokenImageIds}
-              setBrokenImageIds={setBrokenImageIds}
-              loadedImageIds={loadedImageIds}
-              setLoadedImageIds={setLoadedImageIds}
-              setSaveStatus={setSaveStatus}
-            />
+            discoveryData ? <DiscoveryBoard
+                places={discoveryData.places}
+                kinds={discoveryData.kinds}
+                windows={discoveryData.windows}
+                brokenImageIds={brokenImageIds}
+                setBrokenImageIds={setBrokenImageIds}
+                loadedImageIds={loadedImageIds}
+                setLoadedImageIds={setLoadedImageIds}
+                setSaveStatus={setSaveStatus}
+              /> : <LoadingState label="Loading travel ideas" />
           )}
 
           {activeView === "journal" && isPortugalActual && activeTrip.actuals && (
@@ -1413,12 +1467,14 @@ function App() {
           )}
 
           {activeView === "more" && (
-            <MorePanel
-              trip={activeTrip}
-              activities={allVisibleActivities}
-              routeSuggestions={routeSuggestions}
-              replaceActiveTrip={replaceActiveTrip}
-            />
+            <Suspense fallback={<LoadingState label="Loading trip tools" />}>
+              <LazyMorePanel
+                trip={activeTrip}
+                activities={allVisibleActivities}
+                routeSuggestions={routeSuggestions}
+                replaceActiveTrip={replaceActiveTrip}
+              />
+            </Suspense>
           )}
         </div>
       </main>
@@ -1644,8 +1700,8 @@ function ActualPlaces({ trip, updateVisit }: { trip: Trip; updateVisit: (id: str
     <section className="actual-places-view">
       <header className="actual-section-header"><div><p className="eyebrow">Actual places</p><h2>Every stop with evidence</h2></div><span>{visits.length} places</span></header>
       <div className="actual-toolbar">
-        <label className="search-field"><Search size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search places or regions" /></label>
-        <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">All statuses</option><option value="visited">Visited</option><option value="unconfirmed">Unconfirmed</option><option value="skipped">Skipped</option></select>
+        <label className="search-field" aria-label="Search actual places"><Search size={17} aria-hidden="true" /><input aria-label="Search actual places" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search places or regions" /></label>
+        <select aria-label="Filter places by status" value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">All statuses</option><option value="visited">Visited</option><option value="unconfirmed">Unconfirmed</option><option value="skipped">Skipped</option></select>
       </div>
       <div className="actual-place-grid">
         {visits.map((visit) => {
@@ -1656,7 +1712,7 @@ function ActualPlaces({ trip, updateVisit }: { trip: Trip; updateVisit: (id: str
               {image && <img src={image.imageUrl} alt={image.imageAlt || visit.title} loading="lazy" />}
               <div><p className="eyebrow">{formatDate(visit.date)} · {visit.region}</p><h3>{visit.title}</h3><span>{evidenceLabel}</span></div>
               <div className="actual-place-actions">
-                <a className="icon-button" href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(visit.googleMapsQuery)} target="_blank" rel="noreferrer" title={"Open " + visit.title + " in maps"}><MapPin size={17} /></a>
+                <a className="icon-button" href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(visit.googleMapsQuery)} target="_blank" rel="noreferrer" title={"Open " + visit.title + " in maps"} aria-label={"Open " + visit.title + " in maps"}><MapPin size={17} aria-hidden="true" /></a>
                 <select value={visit.status} onChange={(event) => updateVisit(visit.id, { status: event.target.value as ActualVisit["status"], evidence: "manual" })} aria-label={"Status for " + visit.title}><option value="visited">Visited</option><option value="unconfirmed">Unconfirmed</option><option value="skipped">Skipped</option></select>
               </div>
             </article>
@@ -1695,8 +1751,8 @@ function ActualBudgetDashboard({ trip }: { trip: Trip }) {
         </section>
         <section className="actual-ledger-panel">
           <div className="actual-toolbar">
-            <label className="search-field"><Search size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search merchants" /></label>
-            <select value={city} onChange={(event) => setCity(event.target.value)}><option value="all">All cities</option>{cities.map((item) => <option value={item} key={item}>{item}</option>)}</select>
+            <label className="search-field" aria-label="Search actual expenses"><Search size={17} aria-hidden="true" /><input aria-label="Search actual merchants" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search merchants" /></label>
+            <select aria-label="Filter actual expenses by city" value={city} onChange={(event) => setCity(event.target.value)}><option value="all">All cities</option>{cities.map((item) => <option value={item} key={item}>{item}</option>)}</select>
           </div>
           <div className="actual-ledger-heading"><span>{expenses.length} expenses</span><strong>{cadLabel(filteredTotal)}</strong></div>
           <div className="actual-ledger" role="table" aria-label="Portugal actual expenses">
@@ -1839,8 +1895,8 @@ function makeRouteSuggestions(trip: Trip, activities: TripActivity[]): RouteSugg
       id: "japan-routing-future-api",
       tripId: trip.id,
       severity: "info",
-      title: "Future live routing hook",
-      detail: "This is heuristic only. OSRM/open routing estimates can refine these when saved coordinates are available.",
+      title: "Route estimate note",
+      detail: "This route check uses saved itinerary details. Add coordinates when a stop needs a more precise map estimate.",
     });
   }
   return suggestions;
@@ -1865,13 +1921,19 @@ function TripSwitcher({
   return (
     <div className="trip-switcher" aria-label="Trip switcher">
       {tripOrder.map((tripId) => (
-        <button key={tripId} type="button" className={activeTripId === tripId && activeView !== "discovery" ? "active" : ""} onClick={() => setActiveTripId(tripId)}>
+        <Link
+          key={tripId}
+          to={tripId === "japan-2026" ? "/" : `/trips/${tripId}`}
+          className={activeTripId === tripId && activeView !== "discovery" ? "active" : ""}
+          aria-current={activeTripId === tripId && activeView !== "discovery" ? "page" : undefined}
+          onClick={() => setActiveTripId(tripId)}
+        >
           {labels[tripId]}
-        </button>
+        </Link>
       ))}
-      <button type="button" className={activeView === "discovery" ? "active discovery-global-button" : "discovery-global-button"} onClick={openDiscovery}>
+      <Link to="/explore" className={activeView === "discovery" ? "active discovery-global-button" : "discovery-global-button"} aria-current={activeView === "discovery" ? "page" : undefined} onClick={openDiscovery}>
         Discovery
-      </button>
+      </Link>
     </div>
   );
 }
@@ -1981,9 +2043,9 @@ function FilterBar(props: {
           mobile, where this bar used to be ~460px of chrome before any
           itinerary content. */}
       <div className="filter-primary-row">
-        <label className="search-field">
+        <label className="search-field" aria-label="Search itinerary places">
           <Search size={18} aria-hidden="true" />
-          <input value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="Search places, notes, addresses" />
+          <input aria-label="Search itinerary places, notes, and addresses" value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="Search places, notes, addresses" />
         </label>
         <button
           className="ghost-button filter-toggle"
@@ -2750,9 +2812,12 @@ function LeafletActivityMap({
   ariaLabel: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const markerLayerRef = useRef<L.LayerGroup | null>(null);
+  const mapRef = useRef<Leaflet.Map | null>(null);
+  const markerLayerRef = useRef<Leaflet.LayerGroup | null>(null);
+  type LeafletApi = typeof import("leaflet");
+  const leafletRef = useRef<LeafletApi | null>(null);
   const stopsRef = useRef(stops);
+  const [leafletReady, setLeafletReady] = useState(false);
 
   useEffect(() => {
     stopsRef.current = stops;
@@ -2760,34 +2825,47 @@ function LeafletActivityMap({
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const initialView = overviewLeafletView(trip);
-    const map = L.map(containerRef.current, {
-      center: initialView.center,
-      zoom: initialView.zoom,
-      minZoom: 2,
-      maxZoom: 18,
-      zoomControl: true,
-      scrollWheelZoom: true,
-      worldCopyJump: true,
+    let cancelled = false;
+    let fitTimer: number | undefined;
+    let map: Leaflet.Map | null = null;
+    void import("leaflet").then((loaded) => {
+      if (cancelled || !containerRef.current || mapRef.current) return;
+      const L = (loaded as unknown as { default?: LeafletApi }).default || (loaded as unknown as LeafletApi);
+      leafletRef.current = L;
+      const initialView = overviewLeafletView(trip);
+      const createdMap = L.map(containerRef.current, {
+        center: initialView.center,
+        zoom: initialView.zoom,
+        minZoom: 2,
+        maxZoom: 18,
+        zoomControl: true,
+        scrollWheelZoom: true,
+        worldCopyJump: true,
+      });
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: "abcd",
+        maxZoom: 19,
+      }).addTo(createdMap);
+      markerLayerRef.current = L.layerGroup().addTo(createdMap);
+      map = createdMap;
+      mapRef.current = createdMap;
+      setLeafletReady(true);
+      fitTimer = window.setTimeout(() => {
+        if (!mapRef.current) return;
+        createdMap.invalidateSize();
+        fitLeafletStops(createdMap, stopsRef.current, false, L);
+      }, 80);
     });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-      subdomains: "abcd",
-      maxZoom: 19,
-    }).addTo(map);
-    markerLayerRef.current = L.layerGroup().addTo(map);
-    mapRef.current = map;
-    const fitTimer = window.setTimeout(() => {
-      if (!mapRef.current) return;
-      map.invalidateSize();
-      fitLeafletStops(map, stopsRef.current, false);
-    }, 80);
 
     return () => {
-      window.clearTimeout(fitTimer);
-      map.remove();
+      cancelled = true;
+      if (fitTimer !== undefined) window.clearTimeout(fitTimer);
+      map?.remove();
       mapRef.current = null;
       markerLayerRef.current = null;
+      leafletRef.current = null;
+      setLeafletReady(false);
     };
   }, [trip.id]);
 
@@ -2797,6 +2875,8 @@ function LeafletActivityMap({
     markerLayer.clearLayers();
     stops.forEach((activity, index) => {
       if (activity.latitude === undefined || activity.longitude === undefined) return;
+      const L = leafletRef.current;
+      if (!L) return;
       const marker = L.marker([activity.latitude, activity.longitude], {
         icon: L.divIcon({
           className: "",
@@ -2817,16 +2897,18 @@ function LeafletActivityMap({
     const map = mapRef.current;
     const fitTimer = map ? window.setTimeout(() => {
       if (mapRef.current !== map) return;
-      fitLeafletStops(map, stopsRef.current, false);
+      const L = leafletRef.current;
+      if (L) fitLeafletStops(map, stopsRef.current, false, L);
     }, 40) : undefined;
     return () => {
       if (fitTimer !== undefined) window.clearTimeout(fitTimer);
     };
-  }, [stops]);
+  }, [leafletReady, stops]);
 
   useEffect(() => {
     if (!fitNonce || !mapRef.current) return;
-    fitLeafletStops(mapRef.current, stopsRef.current, true);
+    const L = leafletRef.current;
+    if (L) fitLeafletStops(mapRef.current, stopsRef.current, true, L);
   }, [fitNonce]);
 
   return <div ref={containerRef} className={className} aria-label={ariaLabel} />;
@@ -2878,16 +2960,16 @@ function LazyLeafletActivityMap({
   );
 }
 
-function overviewLeafletView(trip: Trip): { center: L.LatLngExpression; zoom: number } {
+function overviewLeafletView(trip: Trip): { center: Leaflet.LatLngExpression; zoom: number } {
   if (trip.id === "portugal-2026") return { center: [39.6, -8.8], zoom: 6 };
   if (trip.id === "peru-2026") return { center: [-9.2, -74.5], zoom: 5 };
   return { center: [35.7, 139.7], zoom: 5 };
 }
 
-function fitLeafletStops(map: L.Map, stops: TripActivity[], animate = true) {
+function fitLeafletStops(map: Leaflet.Map, stops: TripActivity[], animate = true, L: typeof import("leaflet")) {
   const latLngs = stops
     .filter((activity) => activity.latitude !== undefined && activity.longitude !== undefined)
-    .map((activity) => [activity.latitude!, activity.longitude!] as L.LatLngTuple);
+    .map((activity) => [activity.latitude!, activity.longitude!] as Leaflet.LatLngTuple);
   if (!latLngs.length) return;
   map.fitBounds(L.latLngBounds(latLngs).pad(0.18), { animate, maxZoom: 11 });
 }
@@ -3099,11 +3181,11 @@ function OverviewChecklist({
               </label>
               <div className="checklist-actions">
                 {item.isDone && (
-                  <button type="button" className="icon-button" onClick={() => toggleChecklistItem(item.id, false)} title="Restore task">
+                  <button type="button" className="icon-button" onClick={() => toggleChecklistItem(item.id, false)} title="Restore task" aria-label="Restore task">
                     <RotateCcw size={15} aria-hidden="true" />
                   </button>
                 )}
-                <button type="button" className="icon-button" onClick={() => deleteChecklistItem(item.id)} title="Delete task">
+                <button type="button" className="icon-button" onClick={() => deleteChecklistItem(item.id)} title="Delete task" aria-label="Delete task">
                   <Trash2 size={15} aria-hidden="true" />
                 </button>
               </div>
@@ -3242,6 +3324,7 @@ function DayDropZone({ day, children }: { day: number; children: ReactNode }) {
 
 function JapanExploreBoard({
   places,
+  kinds,
   days,
   addPlaceToItinerary,
   brokenImageIds,
@@ -3252,6 +3335,7 @@ function JapanExploreBoard({
   setSaveStatus,
 }: {
   places: JapanExplorePlace[];
+  kinds: Array<JapanExploreKind | "All">;
   days: number[];
   addPlaceToItinerary: (place: JapanExplorePlace, day: number) => void;
   brokenImageIds: Set<string>;
@@ -3304,12 +3388,12 @@ function JapanExploreBoard({
       </div>
 
       <div className="japan-explore-toolbar">
-        <label className="search-field">
+        <label className="search-field" aria-label="Search Japan places">
           <Search size={17} aria-hidden="true" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search neighborhoods, food, temples, rainy days" />
+          <input aria-label="Search Japan neighborhoods, food, temples, and rainy-day ideas" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search neighborhoods, food, temples, rainy days" />
         </label>
         <div className="chip-scroll" aria-label="Explore type filters">
-          {japanExploreKinds.map((option) => (
+          {kinds.map((option) => (
             <button key={option} type="button" className={kind === option ? "chip active" : "chip"} onClick={() => setKind(option)}>
               {option}
             </button>
@@ -3457,6 +3541,8 @@ function JapanExploreCard({
 
 function DiscoveryBoard({
   places,
+  kinds,
+  windows,
   brokenImageIds,
   setBrokenImageIds,
   loadedImageIds,
@@ -3464,6 +3550,8 @@ function DiscoveryBoard({
   setSaveStatus,
 }: {
   places: DiscoveryPlace[];
+  kinds: Array<DiscoveryKind | "All">;
+  windows: Array<DiscoveryWindow | "All">;
   brokenImageIds: Set<string>;
   setBrokenImageIds: Dispatch<SetStateAction<Set<string>>>;
   loadedImageIds: Set<string>;
@@ -3523,19 +3611,19 @@ function DiscoveryBoard({
       </div>
 
       <div className="japan-explore-toolbar discovery-toolbar">
-        <label className="search-field">
+        <label className="search-field" aria-label="Search travel ideas">
           <Search size={17} aria-hidden="true" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search islands, hiking, food, road trips" />
+          <input aria-label="Search islands, hiking, food, and road trips" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search islands, hiking, food, road trips" />
         </label>
         <div className="chip-scroll" aria-label="Travel window filters">
-          {discoveryWindows.map((option) => (
+          {windows.map((option) => (
             <button key={option} type="button" className={windowFilter === option ? "chip active" : "chip"} onClick={() => setWindowFilter(option)}>
               {option}
             </button>
           ))}
         </div>
         <div className="chip-scroll" aria-label="Discovery type filters">
-          {discoveryKinds.map((option) => (
+          {kinds.map((option) => (
             <button key={option} type="button" className={kindFilter === option ? "chip active" : "chip"} onClick={() => setKindFilter(option)}>
               {option}
             </button>
@@ -3735,10 +3823,10 @@ function ActivityCard({
             <h3>{activity.title}</h3>
           </div>
           <div className="card-icon-actions">
-            <button className="icon-button bookmark-button" type="button" onClick={() => updateActivity(activity.id, { isBooked: !activity.isBooked })} title={activity.isBooked ? "Remove booked marker" : "Mark as saved/booked"}>
+            <button className="icon-button bookmark-button" type="button" onClick={() => updateActivity(activity.id, { isBooked: !activity.isBooked })} title={activity.isBooked ? "Remove booked marker" : "Mark as saved/booked"} aria-label={activity.isBooked ? "Remove booked marker" : "Mark as saved or booked"}>
               <Bookmark size={16} aria-hidden="true" />
             </button>
-            <button className="icon-button" type="button" onClick={() => setExpandedId(expanded ? null : activity.id)} aria-expanded={expanded} title="Expand and edit">
+            <button className="icon-button" type="button" onClick={() => setExpandedId(expanded ? null : activity.id)} aria-expanded={expanded} title="Expand and edit" aria-label={expanded ? `Collapse ${activity.title}` : `Expand and edit ${activity.title}`}>
               <ChevronDown size={17} aria-hidden="true" />
             </button>
           </div>
@@ -4003,6 +4091,7 @@ function TripMapPanel({
         <label>
           <Search size={16} aria-hidden="true" />
           <input
+            aria-label={`Search places near ${trip.country}`}
             value={mapSearchQuery}
             onChange={(event) => setMapSearchQuery(event.target.value)}
             placeholder={`Search places near ${trip.country}`}
@@ -4392,9 +4481,9 @@ function BudgetDashboard({
       <section className="inline-editor">
         <h3>Quick cost edits</h3>
         <div className="budget-controls">
-          <label className="search-field">
+          <label className="search-field" aria-label="Search budget items">
             <Search size={17} aria-hidden="true" />
-            <input value={budgetQuery} onChange={(event) => setBudgetQuery(event.target.value)} placeholder="Search costs by place, city, category" />
+            <input aria-label="Search costs by place, city, and category" value={budgetQuery} onChange={(event) => setBudgetQuery(event.target.value)} placeholder="Search costs by place, city, category" />
           </label>
           <select value={budgetView} onChange={(event) => setBudgetView(event.target.value as typeof budgetView)}>
             <option value="all">All editable costs</option>
@@ -4547,7 +4636,7 @@ function AttachmentCard({ attachment }: { attachment: TripAttachment }) {
       <div>
         <h3>{displayName}</h3>
         <p>{note}</p>
-        <span>{attachment.isSensitivePlaceholder ? "local-only placeholder" : "linked reference"}</span>
+        <span>{attachment.isSensitivePlaceholder ? "local-only reference" : "linked reference"}</span>
       </div>
     </article>
   );
@@ -4637,7 +4726,7 @@ function AssistantPanel({ trip, activities, routeSuggestions }: { trip: Trip; ac
   const foodCount = activities.filter((activity) => activity.type === "food" || activity.category === "Food").length;
   const promptCopy: Record<string, string> = {
     "make this day lighter": "Look at the warning cards below and move one optional or low-priority stop out of any crowded day.",
-    "optimize this route": "Use the route preview and day chips to keep each day anchored around one city or base. Live route optimization is not connected yet.",
+    "optimize this route": "Use the route preview and day chips to keep each day anchored around one city or base. The suggestions use the saved itinerary and do not call a live routing service.",
     "find cheaper alternatives": cheaper.length ? "The high-cost list below is the starting point. Mark one as optional or lower the budget after you compare options." : "No high-cost cards are currently crossing the local rule threshold.",
     "add more food stops": foodCount ? `${foodCount} food stops are already tagged. Add a custom Food card on light days if meals need more structure.` : "No food cards are tagged yet. Add Food stops to the lighter days first.",
     "turn this into a map list": "Open Map / Export, then copy rows or download the CSV. It is export-ready for map tools, not a direct sync.",
@@ -4648,11 +4737,11 @@ function AssistantPanel({ trip, activities, routeSuggestions }: { trip: Trip; ac
       <div className="section-heading">
         <div>
           <p className="eyebrow">Local suggestions only</p>
-          <h2>AI Assistant placeholder</h2>
+          <h2>Trip helper</h2>
         </div>
         <Bot size={22} aria-hidden="true" />
       </div>
-      <p>This panel is wired for future prompts, but it does not call paid AI APIs yet. The suggestions below are local rules based on the current itinerary.</p>
+      <p>These suggestions use local rules based on the current itinerary. Nothing is sent to an AI service.</p>
       <div className="prompt-grid">
         {["make this day lighter", "optimize this route", "find cheaper alternatives", "add more food stops", "turn this into a map list", "what should I skip if it rains?"].map((prompt) => (
           <button key={prompt} type="button" className={activePrompt === prompt ? "ghost-button active-prompt" : "ghost-button"} onClick={() => setActivePrompt(prompt)}>{prompt}</button>
@@ -4836,6 +4925,10 @@ function EmptyState({ title, body }: { title: string; body: string }) {
       <p>{body}</p>
     </div>
   );
+}
+
+function LoadingState({ label }: { label: string }) {
+  return <div className="empty-state loading-state" role="status" aria-live="polite"><Sparkles size={20} aria-hidden="true" /><h2>{label}</h2><p>Bringing the saved places into view.</p></div>;
 }
 
 export default App;

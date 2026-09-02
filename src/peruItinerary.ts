@@ -3571,7 +3571,7 @@ export const peruAttachments: TripAttachment[] = [
   {
     "id": "peru-booking-placeholders",
     "tripId": "peru-2026",
-    "fileName": "booking-confirmations-placeholder.pdf",
+    "fileName": "booking-confirmations-reference.pdf",
     "type": "booking",
     "note": "Metadata only. Do not store passports, visa scans, or private IDs in localStorage.",
     "isSensitivePlaceholder": true

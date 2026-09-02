@@ -802,7 +802,7 @@ export const portugalAttachments: TripAttachment[] = [
   {
     id: "portugal-booking-placeholders",
     tripId: "portugal-2026",
-    fileName: "portugal-booking-confirmations-placeholder.pdf",
+    fileName: "portugal-booking-confirmations-reference.pdf",
     type: "booking",
     note: "Metadata only. Add confirmation screenshots later without storing private documents in localStorage.",
     isSensitivePlaceholder: true,
