@@ -10,6 +10,15 @@ Itinerary Mate is a local-first multi-trip itinerary tracker built with Vite, Re
 
 The app is designed as a travel command center: editable cards, budget dashboards, lodging and flight tracking, attachment placeholders, route suggestions, OpenStreetMap-based map previews, CSV export, dark mode, and offline-ready PWA basics.
 
+## Stack
+
+| Concern | Choice |
+| --- | --- |
+| Framework | Vite, React, TypeScript |
+| Maps | Leaflet for day-by-day location previews |
+| Storage | Local-first — trips persist in the browser, exportable as CSV/JSON |
+| Money | Multi-currency budget lines with per-trip conversion |
+
 ## Run Locally
 
 ```bash
